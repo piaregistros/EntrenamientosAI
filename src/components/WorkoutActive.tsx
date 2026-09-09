@@ -127,16 +127,35 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
       const routData = await routRes.json();
       setRoutine(routData.routine || routData);
       setExercises(
-          (routData.exercises || []).map((item: any) => ({
+        (routData.exercises || []).map((item: any) => {
+          const sourceExercise = item.exercise || {};
+
+          const exercise = {
+            ...sourceExercise,
+            id:
+              sourceExercise.id ||
+              item.id ||
+              item.exercise_id ||
+              item.exercise?.exercise_id,
+            name:
+              sourceExercise.name ||
+              item.name ||
+              item.exercise_name ||
+              "Ejercicio",
+          };
+
+          return {
             ...item,
-            id: item.id || item.exercise?.id || item.exercise_id,
+            id: item.id || item.exercise_id || exercise.id,
+            exercise,
             target_sets: item.target_sets ?? item.target?.sets,
             target_rep_min: item.target_rep_min ?? item.target?.rep_min,
             target_rep_max: item.target_rep_max ?? item.target?.rep_max,
             target_rir: item.target_rir ?? item.target?.rir,
             rest_seconds: item.rest_seconds ?? item.target?.rest_seconds,
-          }))
-        );
+          };
+        })
+      );
 
       // 3. Fetch recommendations for the progression rule
       const recsRes = await apiFetch(`/api/routines/${routineId}/recommendations?user_id=${encodeURIComponent(user.id)}`);
@@ -169,7 +188,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
       setInputWeight(lastPerf.sets[0].weight_kg.toString());
       setInputReps(lastPerf.sets[0].reps.toString());
     } else {
-      setInputWeight(activeExercise.id === 'ex-8' ? '0' : '20'); // 20kg bar or 0 for plancha
+      setInputWeight(isTimedExercise(activeExerciseItem) ? '0' : '20'); // 20kg bar or 0 for plancha
       setInputReps(activeExerciseItem.target_rep_min.toString());
     }
     
@@ -488,7 +507,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
               <div className="bg-neutral-950/60 p-3 rounded-xl border border-neutral-800/40">
                 <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block">Objetivo de Serie</span>
                 <p className="text-sm font-black text-white mt-1">
-                  {activeExercise.id === 'ex-8'
+                  {isTimedExercise(activeExerciseItem)
                     ? `${activeExerciseItem.target_sets} × ${activeExerciseItem.target_rep_min}-${activeExerciseItem.target_rep_max} s`
                     : `${activeExerciseItem.target_sets} × ${activeExerciseItem.target_rep_min}-${activeExerciseItem.target_rep_max} reps`
                   }
@@ -498,7 +517,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
                 <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block">Última Vez</span>
                 <p className="text-sm font-mono text-lime-400 mt-1 font-bold">
                   {activeExerciseItem.last_performance && activeExerciseItem.last_performance.sets.length > 0 ? (
-                    activeExercise.id === 'ex-8'
+                    isTimedExercise(activeExerciseItem)
                       ? `${activeExerciseItem.last_performance.sets.map(s => `${s.reps}s`).join('/')}`
                       : `${activeExerciseItem.last_performance.sets[0].weight_kg}kg × ${activeExerciseItem.last_performance.sets.filter(s => !s.is_warmup).map(s => s.reps).join('/')}`
                   ) : (
@@ -517,7 +536,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
                 <div>
                   <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">Progresión Recomendada</h4>
                   <p className="text-[11px] text-lime-400 font-bold mt-1">
-                    {activeExercise.id === 'ex-8'
+                    {isTimedExercise(activeExerciseItem)
                       ? `Intenta aguantar ${activeRec.recommended_reps} segundos en plancha`
                       : `Usa ${activeRec.recommended_weight_kg} kg · apunta a ${activeRec.recommended_reps} reps`
                     }
@@ -536,7 +555,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
             
             <div className="grid grid-cols-2 gap-4">
               {/* Weight control */}
-              {activeExercise.id !== 'ex-8' ? (
+              {!isTimedExercise(activeExerciseItem) ? (
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Peso (kg)</label>
                   <div className="flex items-center gap-1.5 bg-neutral-950 border border-neutral-800 rounded-xl p-1 relative">
@@ -581,7 +600,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
               {/* Reps/Seconds control */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                  {activeExercise.id === 'ex-8' ? 'Tiempo (s)' : 'Reps'}
+                  {isTimedExercise(activeExerciseItem) ? 'Tiempo (s)' : 'Reps'}
                 </label>
                 <div className="flex items-center gap-1.5 bg-neutral-950 border border-neutral-800 rounded-xl p-1 relative">
                   <button
@@ -706,11 +725,11 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-black text-white">
-                          {set.exercise_id === 'ex-8' ? 'Plancha' : `${set.weight_kg} kg`}
+                          {set.exercise_name?.trim().toLowerCase() === 'plancha' ? 'Plancha' : `${set.weight_kg} kg`}
                         </span>
                         <span className="text-neutral-500 text-xs">×</span>
                         <span className="text-xs font-black text-white">
-                          {set.reps} {set.exercise_id === 'ex-8' ? 'segundos' : 'reps'}
+                          {set.reps} {set.exercise_name?.trim().toLowerCase() === 'plancha' ? 'segundos' : 'reps'}
                         </span>
                         {set.rir !== null && (
                           <span className="text-[9px] bg-neutral-950 border border-neutral-800 px-2 py-0.5 rounded-md text-neutral-400 font-bold">
