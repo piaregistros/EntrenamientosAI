@@ -23,33 +23,84 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
   const [selectedRoutineForPreview, setSelectedRoutineForPreview] = useState<Routine | null>(null);
 
   useEffect(() => {
+    if (!user?.id) return;
     fetchDashboardData();
-  }, []);
+  }, [user?.id]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     setError(null);
-    try {
-      // 1. Fetch routines
-      const routRes = await apiFetch('/api/routines');
-      if (!routRes.ok) throw new Error('Error al cargar rutinas');
-      const routData = await routRes.json();
-      setRoutines(routData);
 
-      // 2. Fetch workouts (for last session)
-      const workRes = await apiFetch('/api/workouts');
-      if (!workRes.ok) throw new Error('Error al cargar historial');
-      const workData = await workRes.json();
-      const completed = workData.filter((w: any) => w.status === 'completed');
-      if (completed.length > 0) {
-        setLastWorkout(completed[0]); // Most recent completed
+    try {
+      // 1. Rutinas del usuario
+      const routRes = await apiFetch(
+        `/api/routines?user_id=${encodeURIComponent(user.id)}`
+      );
+
+      if (!routRes.ok) {
+        throw new Error('Error al cargar rutinas');
       }
 
-      // 3. Fetch body metrics
-      const metricRes = await apiFetch('/api/body-metrics');
-      if (!metricRes.ok) throw new Error('Error al cargar métricas de peso');
+      const routData = await routRes.json();
+      const routineList = Array.isArray(routData) ? routData : [];
+
+      // El listado de rutinas no incluye necesariamente sus ejercicios.
+      // Cargamos el detalle real de cada rutina para la vista previa.
+      const routinesWithExercises = await Promise.all(
+        routineList.map(async (routine: Routine) => {
+          const detailRes = await apiFetch(
+            `/api/routines/${routine.id}?user_id=${encodeURIComponent(user.id)}`
+          );
+
+          if (!detailRes.ok) {
+            return routine;
+          }
+
+          const detail = await detailRes.json();
+
+          return {
+            ...routine,
+            ...detail,
+            exercises: Array.isArray(detail.exercises)
+              ? detail.exercises
+              : routine.exercises || [],
+          };
+        })
+      );
+
+      setRoutines(routinesWithExercises);
+
+      // 2. Historial de entrenamientos
+      const workRes = await apiFetch(
+        `/api/workouts?user_id=${encodeURIComponent(user.id)}`
+      );
+
+      if (!workRes.ok) {
+        throw new Error('Error al cargar historial');
+      }
+
+      const workData = await workRes.json();
+      const completed = Array.isArray(workData)
+        ? workData.filter((w: WorkoutLog) => w.status === 'completed')
+        : [];
+
+      setLastWorkout(completed.length > 0 ? completed[0] : null);
+
+      // 3. Métricas corporales
+      const metricRes = await apiFetch(
+        `/api/body-metrics?user_id=${encodeURIComponent(user.id)}`
+      );
+
+      if (!metricRes.ok) {
+        throw new Error('Error al cargar métricas de peso');
+      }
+
       const metricData = await metricRes.json();
-      setMetrics(metricData);
+      setMetrics(
+        Array.isArray(metricData.metrics)
+          ? metricData.metrics
+          : []
+      );
     } catch (err: any) {
       setError(err.message || 'Error al conectar con el servidor.');
     } finally {
@@ -76,6 +127,7 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          user_id: user.id,
           weight_kg: weight,
           date: new Date().toISOString().split('T')[0],
           notes: 'Registrado desde la pantalla de inicio'
@@ -90,8 +142,10 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
       setSuccessMsg(`¡Peso de ${weight} kg registrado con éxito!`);
       setWeightInput('');
       
-      // Update local metrics
-      setMetrics([data, ...metrics]);
+      // El backend devuelve la métrica creada directamente.
+      // Aceptamos también { metric: ... } por compatibilidad.
+      const savedMetric = data.metric ?? data;
+      setMetrics((previous) => [savedMetric, ...previous]);
     } catch (err: any) {
       setError(err.message || 'No se pudo registrar el peso.');
     } finally {
@@ -288,32 +342,18 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
                   const firstSet = lastWorkout.sets!.find(s => s.exercise_id === exerciseId);
                   if (exerciseSets.length === 0) return null;
                   
-                  // Rough name mapper for local display, we can use ex IDs mapped
-                  const exNames: Record<string, string> = {
-                    'ex-1': 'Curl bíceps',
-                    'ex-2': 'Curl femoral',
-                    'ex-3': 'Elevaciones laterales',
-                    'ex-4': 'Extensión tríceps',
-                    'ex-5': 'Face pull',
-                    'ex-6': 'Hip thrust',
-                    'ex-7': 'Jalón neutro',
-                    'ex-8': 'Plancha',
-                    'ex-9': 'Prensa de piernas',
-                    'ex-10': 'Press banca plano',
-                    'ex-11': 'Press hombro mancuerna',
-                    'ex-12': 'Press inclinado 30°',
-                    'ex-13': 'Remo pecho apoyado',
-                    'ex-14': 'Remo unilateral',
-                    'ex-15': 'Sentadilla búlgara',
-                    'ex-16': 'Zancadas'
-                  };
-                  const name = exNames[exerciseId] || 'Ejercicio';
+                  const name =
+                    firstSet?.exercise_name ||
+                    'Ejercicio';
+
+                  const isTimedExercise =
+                    name.trim().toLowerCase() === 'plancha';
 
                   return (
                     <div key={exerciseId} className="flex justify-between items-center bg-neutral-950/40 p-2.5 rounded-xl border border-neutral-800/40">
                       <span className="text-xs font-extrabold text-neutral-300">{name}</span>
                       <span className="text-[11px] font-mono text-lime-400">
-                        {exerciseId === 'ex-8' 
+                        {isTimedExercise
                           ? `${exerciseSets.map(s => `${s.reps}s`).join(' · ')}`
                           : `${exerciseSets[0].weight_kg}kg · ${exerciseSets.map(s => s.reps).join('/')}`
                         }
@@ -385,7 +425,7 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-bold text-lime-400">
-                        {re.exercise_id === 'ex-8' 
+                        {re.exercise?.name?.trim().toLowerCase() === 'plancha'
                           ? `${re.target_sets} × ${re.target_rep_min}-${re.target_rep_max}s`
                           : `${re.target_sets} × ${re.target_rep_min}-${re.target_rep_max}`
                         }

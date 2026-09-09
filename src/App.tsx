@@ -160,7 +160,10 @@ export default function App() {
       )}
 
       {activeTab === 'history' && (
-        <HistoryList onOpenExerciseInfo={handleOpenExerciseInfo} />
+        <HistoryList
+          user={user}
+          onOpenExerciseInfo={handleOpenExerciseInfo}
+        />
       )}
 
       {activeTab === 'stats' && <StatsView user={user} />}

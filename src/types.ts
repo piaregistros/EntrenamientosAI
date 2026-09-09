@@ -53,7 +53,7 @@ export interface RoutineExercise {
 export interface WorkoutLog {
   id: string;
   user_id: string;
-  routine_id: string;
+  routine_id: string | null;
   date: string;
   duration_minutes: number;
   notes: string;
@@ -72,6 +72,7 @@ export interface WorkoutSet {
   rir: number | null;
   is_warmup: boolean;
   notes?: string;
+  exercise_name?: string;
 }
 
 export interface BodyMetric {

@@ -4,53 +4,52 @@ import { WorkoutLog, WorkoutSet, Exercise } from '../types';
 import { apiFetch } from '../lib/api';
 
 interface HistoryListProps {
+  user: {
+    id: string;
+    name?: string;
+    role?: string;
+  };
   onOpenExerciseInfo?: (exercise: Exercise) => void;
 }
 
-export default function HistoryList({ onOpenExerciseInfo }: HistoryListProps) {
+export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListProps) {
   const [workouts, setWorkouts] = useState<WorkoutLog[]>([]);
   const [exercisesList, setExercisesList] = useState<Exercise[]>([]);
   const [expandedWorkoutId, setExpandedWorkoutId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Group maps to find exercise names for rendering
-  const exNames: Record<string, string> = {
-    'ex-1': 'Curl de bíceps en máquina',
-    'ex-2': 'Curl femoral',
-    'ex-3': 'Elevaciones laterales en máquina',
-    'ex-4': 'Extensión de tríceps en polea',
-    'ex-5': 'Face pull',
-    'ex-6': 'Hip thrust',
-    'ex-7': 'Jalón al pecho agarre neutro',
-    'ex-8': 'Plancha',
-    'ex-9': 'Prensa de piernas',
-    'ex-10': 'Press banca plano',
-    'ex-11': 'Press de hombro con mancuernas agarre neutro',
-    'ex-12': 'Press inclinado con mancuernas 30 grados',
-    'ex-13': 'Remo con pecho apoyado',
-    'ex-14': 'Remo unilateral con mancuerna',
-    'ex-15': 'Sentadilla búlgara',
-    'ex-16': 'Zancadas'
-  };
-
   useEffect(() => {
+    if (!user?.id) return;
     fetchHistory();
-  }, []);
+  }, [user?.id]);
 
   const fetchHistory = async () => {
     setLoading(true);
     setError(null);
+
     try {
-      const res = await apiFetch('/api/workouts');
-      if (!res.ok) throw new Error('Error al obtener el historial de entrenamientos');
+      const res = await apiFetch(
+        `/api/workouts?user_id=${encodeURIComponent(user.id)}`
+      );
+
+      if (!res.ok) {
+        throw new Error('Error al obtener el historial de entrenamientos');
+      }
+
       const data = await res.json();
-      setWorkouts(data);
+      setWorkouts(Array.isArray(data) ? data : []);
 
       const exRes = await apiFetch('/api/exercises');
+
       if (exRes.ok) {
         const exData = await exRes.json();
-        setExercisesList(exData);
+
+        setExercisesList(
+          Array.isArray(exData.exercises)
+            ? exData.exercises
+            : []
+        );
       }
     } catch (err: any) {
       setError(err.message || 'Error al conectar con el servidor.');
@@ -65,8 +64,15 @@ export default function HistoryList({ onOpenExerciseInfo }: HistoryListProps) {
 
   const calculateTotalVolume = (sets: WorkoutSet[] | undefined) => {
     if (!sets) return 0;
+
     return sets.reduce((sum, s) => {
-      if (s.is_warmup || s.exercise_id === 'ex-8') return sum; // exclude warmup and Plancha
+      const isTimedExercise =
+        s.exercise_name?.trim().toLowerCase() === 'plancha';
+
+      if (s.is_warmup || isTimedExercise) {
+        return sum;
+      }
+
       return sum + s.weight_kg * s.reps;
     }, 0);
   };
@@ -191,7 +197,10 @@ export default function HistoryList({ onOpenExerciseInfo }: HistoryListProps) {
                           {(Array.from(new Set(workout.sets.map(s => s.exercise_id))) as string[]).map(exId => {
                             const exSets = workout.sets!.filter(s => s.exercise_id === exId);
                             const matchedExercise = exercisesList.find(e => e.id === exId);
-                            const name = matchedExercise?.name || exNames[exId] || 'Ejercicio';
+                            const name =
+                              exSets.find(s => s.exercise_name)?.exercise_name ||
+                              matchedExercise?.name ||
+                              'Ejercicio';
 
                             return (
                               <div key={exId} className="bg-neutral-900 border border-neutral-850/50 p-3 rounded-xl space-y-2">
@@ -223,7 +232,7 @@ export default function HistoryList({ onOpenExerciseInfo }: HistoryListProps) {
                                         {s.is_warmup ? 'Calentamiento' : `Serie ${s.set_number}`}
                                       </span>
                                       <span className="text-white font-bold">
-                                        {s.exercise_id === 'ex-8'
+                                        {s.exercise_name?.trim().toLowerCase() === 'plancha'
                                           ? `${s.reps}s`
                                           : `${s.weight_kg}kg × ${s.reps} ${s.rir !== null ? `(RIR ${s.rir})` : ''}`
                                         }
