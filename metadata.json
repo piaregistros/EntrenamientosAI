@@ -1,0 +1,6 @@
+{
+  "name": "Entrenamiento",
+  "description": "Aplicación web privada para registrar, consultar y analizar entrenamientos de fuerza e hipertrofia.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
