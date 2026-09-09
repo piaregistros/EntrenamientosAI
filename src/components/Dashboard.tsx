@@ -58,12 +58,46 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
 
           const detail = await detailRes.json();
 
+          const rawExercises = Array.isArray(detail.exercises)
+            ? detail.exercises
+            : routine.exercises || [];
+
+          const normalizedExercises = rawExercises.map((item: any) => {
+            const sourceExercise = item.exercise || {};
+
+            const exercise = {
+              ...sourceExercise,
+              id:
+                sourceExercise.id ||
+                item.exercise_id ||
+                item.id ||
+                item.exercise?.exercise_id,
+              name:
+                sourceExercise.name ||
+                item.name ||
+                item.exercise_name ||
+                "Ejercicio",
+              target_muscle:
+                sourceExercise.target_muscle ||
+                item.target_muscle ||
+                "",
+              equipment:
+                sourceExercise.equipment ||
+                item.equipment ||
+                "",
+            };
+
+            return {
+              ...item,
+              exercise,
+              exercise_id: item.exercise_id || exercise.id,
+            };
+          });
+
           return {
             ...routine,
             ...detail,
-            exercises: Array.isArray(detail.exercises)
-              ? detail.exercises
-              : routine.exercises || [],
+            exercises: normalizedExercises,
           };
         })
       );
