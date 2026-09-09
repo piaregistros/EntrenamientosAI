@@ -81,10 +81,50 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
                 sourceExercise.target_muscle ||
                 item.target_muscle ||
                 "",
+              category:
+                sourceExercise.category ||
+                item.category ||
+                "",
               equipment:
                 sourceExercise.equipment ||
                 item.equipment ||
                 "",
+              safety_notes:
+                sourceExercise.safety_notes ??
+                item.safety_notes ??
+                "",
+              instructions:
+                sourceExercise.instructions ??
+                item.instructions ??
+                "",
+              contraindications:
+                sourceExercise.contraindications ??
+                item.contraindications ??
+                "",
+              weight_increment_kg:
+                sourceExercise.weight_increment_kg ??
+                item.weight_increment_kg ??
+                0,
+              progression_type:
+                sourceExercise.progression_type ??
+                item.progression_type ??
+                "",
+              rep_progression_enabled:
+                sourceExercise.rep_progression_enabled ??
+                item.rep_progression_enabled ??
+                false,
+              steps:
+                sourceExercise.steps ??
+                item.steps,
+              technical_cues:
+                sourceExercise.technical_cues ??
+                item.technical_cues,
+              common_mistakes:
+                sourceExercise.common_mistakes ??
+                item.common_mistakes,
+              video_url:
+                sourceExercise.video_url ??
+                item.video_url,
             };
 
             return {
