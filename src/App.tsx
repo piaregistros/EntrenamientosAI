@@ -49,37 +49,63 @@ export default function App() {
     setIsExerciseInfoOpen(true);
   };
 
-  // Load user from localStorage if it exists
+  // Restore the authenticated session from the HttpOnly session cookie.
   useEffect(() => {
-    const savedUser = localStorage.getItem('entrenamiento_user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        localStorage.removeItem('entrenamiento_user');
-      }
-    }
-    setCheckingSession(false);
+    let mounted = true;
 
-    // Listen to unauthorized events to force logout
-    const handleUnauthorized = () => {
-      localStorage.removeItem('entrenamiento_user');
-      setUser(null);
+    const checkSession = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+        });
+
+        if (!mounted) return;
+
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Session check error:", error);
+        if (mounted) {
+          setUser(null);
+        }
+      } finally {
+        if (mounted) {
+          setCheckingSession(false);
+        }
+      }
     };
 
-    window.addEventListener('unauthorized', handleUnauthorized);
-    return () => window.removeEventListener('unauthorized', handleUnauthorized);
+    checkSession();
+
+    const handleUnauthorized = () => {
+      if (mounted) {
+        setUser(null);
+        setActiveRoutineId(null);
+        setActiveTab("home");
+      }
+    };
+
+    window.addEventListener("unauthorized", handleUnauthorized);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener("unauthorized", handleUnauthorized);
+    };
   }, []);
 
   const handleLoginSuccess = (userData: any) => {
-    localStorage.setItem('entrenamiento_user', JSON.stringify(userData));
     setUser(userData);
-    setActiveTab('home');
+    setActiveTab("home");
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('entrenamiento_user');
     setUser(null);
+    setActiveRoutineId(null);
+    setActiveTab("home");
   };
 
   // Global fetch proxy is now handled via apiFetch utility to prevent read-only window.fetch assignment error

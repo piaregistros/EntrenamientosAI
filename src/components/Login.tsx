@@ -24,13 +24,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setError(null);
 
     try {
-      const isEmail = emailOrName.includes('@');
-      const body: any = { password };
-      if (isEmail) {
-        body.email = emailOrName.trim();
-      } else {
-        body.name = emailOrName.trim();
-      }
+      const body = {
+        name: emailOrName.trim(),
+        password,
+      };
 
       const res = await apiFetch('/api/auth/login', {
         method: 'POST',
