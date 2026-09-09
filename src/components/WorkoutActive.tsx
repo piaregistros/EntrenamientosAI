@@ -11,6 +11,12 @@ interface WorkoutActiveProps {
   onOpenExerciseInfo?: (exercise: any) => void;
 }
 
+function isTimedExercise(exercise: any) {
+  return String(exercise?.exercise?.name || exercise?.name || "")
+    .trim()
+    .toLowerCase() === "plancha";
+}
+
 export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOpenExerciseInfo }: WorkoutActiveProps) {
   const [workoutLog, setWorkoutLog] = useState<WorkoutLog | null>(null);
   const [routine, setRoutine] = useState<Routine | null>(null);
@@ -108,21 +114,32 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ routine_id: routineId })
+        body: JSON.stringify({ user_id: user.id,
+      routine_id: routineId })
       });
       if (!startRes.ok) throw new Error('No se pudo inicializar el entrenamiento');
       const startData = await startRes.json();
       setWorkoutLog(startData);
 
       // 2. Fetch routine with exercise list and last performance
-      const routRes = await apiFetch(`/api/routines/${routineId}/with-last-performance`);
+      const routRes = await apiFetch(`/api/routines/${routineId}/with-last-performance?user_id=${encodeURIComponent(user.id)}`);
       if (!routRes.ok) throw new Error('Error al cargar datos de rutina');
       const routData = await routRes.json();
-      setRoutine(routData);
-      setExercises(routData.exercises || []);
+      setRoutine(routData.routine || routData);
+      setExercises(
+          (routData.exercises || []).map((item: any) => ({
+            ...item,
+            id: item.id || item.exercise?.id || item.exercise_id,
+            target_sets: item.target_sets ?? item.target?.sets,
+            target_rep_min: item.target_rep_min ?? item.target?.rep_min,
+            target_rep_max: item.target_rep_max ?? item.target?.rep_max,
+            target_rir: item.target_rir ?? item.target?.rir,
+            rest_seconds: item.rest_seconds ?? item.target?.rest_seconds,
+          }))
+        );
 
       // 3. Fetch recommendations for the progression rule
-      const recsRes = await apiFetch(`/api/routines/${routineId}/recommendations`);
+      const recsRes = await apiFetch(`/api/routines/${routineId}/recommendations?user_id=${encodeURIComponent(user.id)}`);
       if (recsRes.ok) {
         const recsData = await recsRes.json();
         setRecommendations(recsData.recommendations || []);
@@ -174,7 +191,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     setError(null);
 
     try {
-      const res = await apiFetch(`/api/workouts/${workoutLog.id}/sets`, {
+      const res = await apiFetch(`/api/workouts/${workoutLog.id}/sets?user_id=${encodeURIComponent(user.id)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -212,7 +229,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     if (!workoutLog) return;
     setError(null);
     try {
-      const res = await apiFetch(`/api/workouts/${workoutLog.id}/sets/${setId}`, {
+      const res = await apiFetch(`/api/workouts/${workoutLog.id}/sets/${setId}?user_id=${encodeURIComponent(user.id)}`, {
         method: 'DELETE',
       });
       
@@ -235,7 +252,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     setError(null);
 
     try {
-      const res = await apiFetch(`/api/workouts/${workoutLog.id}`, {
+      const res = await apiFetch(`/api/workouts/${workoutLog.id}?user_id=${encodeURIComponent(user.id)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -268,7 +285,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     setAvailableSubs([]);
     setError(null);
     try {
-      const res = await apiFetch(`/api/exercises/${activeExercise.id}/substitutions`);
+      const res = await apiFetch(`/api/exercises/${activeExercise.id}/substitutions?user_id=${encodeURIComponent(user.id)}`);
       if (!res.ok) throw new Error('No se encontraron alternativas.');
       const data = await res.json();
       setAvailableSubs(data);
@@ -284,7 +301,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     setError(null);
 
     try {
-      const res = await apiFetch(`/api/workouts/${workoutLog.id}/substitute-exercise`, {
+      const res = await apiFetch(`/api/workouts/${workoutLog.id}/substitute-exercise?user_id=${encodeURIComponent(user.id)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
