@@ -28,15 +28,15 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
 
   useEffect(() => {
     fetchMetrics();
-  }, []);
+  }, [user.id]);
 
   const fetchMetrics = async () => {
     setLoadingMetrics(true);
     try {
-      const res = await apiFetch('/api/body-metrics');
+      const res = await apiFetch(`/api/body-metrics?user_id=${user.id}`);
       if (res.ok) {
         const data = await res.json();
-        setMetrics(data);
+        setMetrics(data.metrics || []);
       }
     } catch (e) {
       console.error('Error fetching metrics', e);
@@ -64,6 +64,7 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          user_id: user.id,
           weight_kg: weight,
           date: dateInput,
           notes: 'Registrado desde perfil'
@@ -99,7 +100,7 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
       }
 
       setSuccess('Métrica eliminada.');
-      setMetrics(metrics.filter(m => m.id !== metricId));
+      setMetrics(prev => prev.filter(m => m.id !== metricId));
     } catch (err: any) {
       setError(err.message || 'Error al eliminar.');
     }
