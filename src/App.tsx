@@ -138,7 +138,7 @@ export default function App() {
         <HistoryList onOpenExerciseInfo={handleOpenExerciseInfo} />
       )}
 
-      {activeTab === 'stats' && <StatsView />}
+      {activeTab === 'stats' && <StatsView user={user} />}
 
       {activeTab === 'profile' && (
         <ProfileView user={user} onLogout={handleLogout} />
