@@ -64,7 +64,6 @@ export default function App() {
     // Listen to unauthorized events to force logout
     const handleUnauthorized = () => {
       localStorage.removeItem('entrenamiento_user');
-      sessionStorage.removeItem('csrf_token');
       setUser(null);
     };
 

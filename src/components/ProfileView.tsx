@@ -152,7 +152,6 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
     } catch (e) {
       console.error('Logout error', e);
     } finally {
-      sessionStorage.removeItem('csrf_token');
       onLogout();
     }
   };

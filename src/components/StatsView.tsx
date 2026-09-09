@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Trophy, TrendingUp, Dumbbell, Timer, Flame, CheckCircle, BarChart3, ChevronRight, Loader, AlertTriangle } from 'lucide-react';
 import { PRRecord, WorkoutStats } from '../types';
 import { apiFetch } from '../lib/api';
-import BodyPhotosSection from './BodyPhotosSection';
+import BodyEvolutionSection from './BodyEvolutionSection';
 
 interface StatsViewProps {
   user: any;
@@ -116,7 +116,7 @@ export default function StatsView({ user }: StatsViewProps) {
               : 'text-neutral-400 hover:text-neutral-200'
           }`}
         >
-          Fotos de Evolución
+          Evolución Corporal
         </button>
       </div>
 
@@ -287,7 +287,7 @@ export default function StatsView({ user }: StatsViewProps) {
           </div>
         </>
       ) : (
-        <BodyPhotosSection user={user} />
+        <BodyEvolutionSection user={user} />
       )}
     </div>
   );

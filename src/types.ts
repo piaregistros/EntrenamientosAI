@@ -79,7 +79,40 @@ export interface BodyMetric {
   user_id: string;
   date: string; // YYYY-MM-DD
   weight_kg: number;
-  notes?: string;
+  body_fat_pct?: number | null;
+  muscle_mass_kg?: number | null;
+  water_pct?: number | null;
+  visceral_fat?: number | null;
+  basal_metabolic_rate_kcal?: number | null;
+  bone_mass_kg?: number | null;
+  notes?: string | null;
+}
+
+export interface BodyMeasurement {
+  id: string;
+  user_id: string;
+  date: string; // YYYY-MM-DD
+  waist_cm?: number | null;
+  chest_cm?: number | null;
+  arm_left_cm?: number | null;
+  arm_right_cm?: number | null;
+  thigh_left_cm?: number | null;
+  thigh_right_cm?: number | null;
+  hip_cm?: number | null;
+  neck_cm?: number | null;
+  notes?: string | null;
+}
+
+export interface UserGoal {
+  id: string;
+  user_id: string;
+  goal_type: 'muscle_gain' | 'strength' | 'fat_loss' | 'maintenance' | 'other';
+  title: string;
+  description?: string | null;
+  start_date: string; // YYYY-MM-DD
+  target_date?: string | null; // YYYY-MM-DD
+  is_active: boolean;
+  created_at?: string;
 }
 
 export interface ExerciseSubstitution {

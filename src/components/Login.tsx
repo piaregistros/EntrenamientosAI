@@ -45,8 +45,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         throw new Error(data.error || 'Credenciales incorrectas');
       }
 
-      // Save token in sessionStorage or localStorage so fetches can include it
-      sessionStorage.setItem('csrf_token', data.csrf_token);
+      // Save user profile state
       onLoginSuccess(data);
     } catch (err: any) {
       setError(err.message || 'Error al conectar con el servidor.');
@@ -75,7 +74,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         throw new Error(data.error || 'Acceso rápido fallido');
       }
 
-      sessionStorage.setItem('csrf_token', data.csrf_token);
       onLoginSuccess(data);
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión rápida.');
