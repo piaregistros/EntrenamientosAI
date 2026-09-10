@@ -20,6 +20,29 @@ const GOAL_TYPE_LABELS: Record<string, string> = {
   other: 'Otro'
 };
 
+// Las fechas de mediciones son fechas de calendario, no instantes UTC.
+// Generamos siempre YYYY-MM-DD usando la fecha local del dispositivo.
+function getLocalDateString(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Convierte una fecha YYYY-MM-DD sin pasar por UTC.
+function parseLocalDate(dateString: string): Date {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+// Muestra una fecha de calendario sin desplazamientos por zona horaria.
+function formatLocalDate(
+  dateString: string,
+  options: Intl.DateTimeFormatOptions
+): string {
+  return parseLocalDate(dateString).toLocaleDateString('es-ES', options);
+}
+
 // Simple custom line chart using SVG for lightweight, high-performance visualization
 function SVGLineChart({
   data,
@@ -42,7 +65,7 @@ function SVGLineChart({
       value: Number(item[dataKey]),
     }))
     // Sort chronologically (oldest to newest)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
 
   if (validData.length === 0) {
     return (
@@ -178,7 +201,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
 
   // Form States
   const [metricForm, setMetricForm] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     weight_kg: '',
     body_fat_pct: '',
     muscle_mass_kg: '',
@@ -190,7 +213,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
   });
 
   const [measurementForm, setMeasurementForm] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     waist_cm: '',
     chest_cm: '',
     arm_left_cm: '',
@@ -206,7 +229,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
     goal_type: 'muscle_gain',
     title: '',
     description: '',
-    start_date: new Date().toISOString().split('T')[0],
+    start_date: getLocalDateString(),
     target_date: ''
   });
 
@@ -226,7 +249,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
         // The API returns { count: X, metrics: [...] }
         setMetrics(data.metrics || []);
       } else if (activeTab === 'medidas') {
-        const res = await apiFetch(`/api/body-measurements?user_id=${user.id}`);
+        const res = await apiFetch(`/api/body/measurements?user_id=${user.id}`);
         if (!res.ok) throw new Error('Error al cargar medidas corporales');
         const data = await res.json();
         // The API returns { count: X, measurements: [...] }
@@ -282,7 +305,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
 
       // Reset form and close
       setMetricForm({
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         weight_kg: '',
         body_fat_pct: '',
         muscle_mass_kg: '',
@@ -334,7 +357,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
         notes: measurementForm.notes || null
       };
 
-      const res = await apiFetch('/api/body-measurements', {
+      const res = await apiFetch('/api/body/measurements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -346,7 +369,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
       }
 
       setMeasurementForm({
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         waist_cm: '',
         chest_cm: '',
         arm_left_cm: '',
@@ -401,7 +424,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
         goal_type: 'muscle_gain',
         title: '',
         description: '',
-        start_date: new Date().toISOString().split('T')[0],
+        start_date: getLocalDateString(),
         target_date: ''
       });
       setShowGoalForm(false);
@@ -432,7 +455,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
     if (!window.confirm('¿Seguro que deseas eliminar este registro de medidas?')) return;
     setError(null);
     try {
-      const res = await apiFetch(`/api/body-measurements/${id}?user_id=${user.id}`, {
+      const res = await apiFetch(`/api/body/measurements/${id}?user_id=${user.id}`, {
         method: 'DELETE'
       });
       if (!res.ok) throw new Error('Error al eliminar medidas');
@@ -740,7 +763,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
                         <div className="flex items-center gap-3">
                           <Calendar size={14} className="text-neutral-500" />
                           <span className="text-xs font-mono font-bold text-neutral-300">
-                            {new Date(metric.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {formatLocalDate(metric.date, { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -818,7 +841,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
               <span className="text-xs font-bold text-neutral-300 flex items-center gap-1.5"><Ruler size={14} className="text-lime-400" /> Últimas Medidas Corporales</span>
               {latestMeasurement && (
                 <span className="text-[10px] font-mono text-neutral-500">
-                  {new Date(latestMeasurement.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                  {formatLocalDate(latestMeasurement.date, { day: 'numeric', month: 'short' })}
                 </span>
               )}
             </div>
@@ -1075,7 +1098,7 @@ export default function BodyEvolutionSection({ user }: BodyEvolutionSectionProps
                         <div className="flex items-center gap-3">
                           <Calendar size={14} className="text-neutral-500" />
                           <span className="text-xs font-mono font-bold text-neutral-300">
-                            {new Date(m.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {formatLocalDate(m.date, { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
