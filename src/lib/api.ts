@@ -1,10 +1,16 @@
 function getCookie(name: string): string {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) {
-    const popped = parts.pop();
-    if (popped) return popped.split(';').shift() || '';
+  const cookies = document.cookie.split(';');
+
+  for (const cookie of cookies) {
+    const separator = cookie.indexOf('=');
+    if (separator === -1) continue;
+
+    const cookieName = cookie.slice(0, separator).trim();
+    if (cookieName !== name) continue;
+
+    return decodeURIComponent(cookie.slice(separator + 1).trim());
   }
+
   return '';
 }
 
