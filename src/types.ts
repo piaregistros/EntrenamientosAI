@@ -57,7 +57,8 @@ export interface WorkoutLog {
   date: string;
   duration_minutes: number;
   notes: string;
-  status: 'in_progress' | 'completed' | 'cancelled';
+  status: 'in_progress' | 'completed' | 'cancelled' | 'expired';
+  current_exercise_id?: string | null;
   routine_name?: string;
   sets?: WorkoutSet[];
 }

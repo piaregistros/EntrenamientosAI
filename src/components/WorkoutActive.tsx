@@ -7,7 +7,9 @@ import { apiFetch } from '../lib/api';
 interface WorkoutActiveProps {
   user: any;
   routineId: string;
+  existingWorkoutId?: string | null;
   onWorkoutFinished: () => void;
+  onWorkoutExit: () => void;
   onOpenExerciseInfo?: (exercise: any) => void;
 }
 
@@ -17,7 +19,14 @@ function isTimedExercise(exercise: any) {
     .toLowerCase() === "plancha";
 }
 
-export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOpenExerciseInfo }: WorkoutActiveProps) {
+export default function WorkoutActive({
+  user,
+  routineId,
+  existingWorkoutId,
+  onWorkoutFinished,
+  onWorkoutExit,
+  onOpenExerciseInfo,
+}: WorkoutActiveProps) {
   const [workoutLog, setWorkoutLog] = useState<WorkoutLog | null>(null);
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [exercises, setExercises] = useState<RoutineExercise[]>([]);
@@ -77,10 +86,10 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     }
   };
 
-  // Start workout and fetch details on mount
+  // Start or recover workout and fetch details on mount.
   useEffect(() => {
     startWorkoutSession();
-  }, [routineId]);
+  }, [routineId, existingWorkoutId]);
 
   // Main session stopwatch
   useEffect(() => {
@@ -108,26 +117,76 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     setLoading(true);
     setError(null);
     try {
-      // 1. Create a workout log on the server (status: in_progress)
-      const startRes = await apiFetch('/api/workouts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ user_id: user.id,
-      routine_id: routineId })
-      });
-      if (!startRes.ok) throw new Error('No se pudo inicializar el entrenamiento');
-      const startData = await startRes.json();
+      // 1. Recover the existing session when App.tsx restored one.
+      // Otherwise create a new in_progress session.
+      let startData: any;
+
+      if (existingWorkoutId) {
+        const existingRes = await apiFetch(
+          `/api/workouts/${encodeURIComponent(existingWorkoutId)}?user_id=${encodeURIComponent(user.id)}`
+        );
+
+        if (!existingRes.ok) {
+          throw new Error('No se pudo recuperar el entrenamiento en curso');
+        }
+
+        startData = await existingRes.json();
+        setLoggedSets(Array.isArray(startData.sets) ? startData.sets : []);
+      } else {
+        const startRes = await apiFetch('/api/workouts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: user.id,
+            routine_id: routineId,
+          }),
+        });
+
+        if (!startRes.ok) {
+          throw new Error('No se pudo inicializar el entrenamiento');
+        }
+
+        startData = await startRes.json();
+
+        // Si el backend ha encontrado una sesión ya existente,
+        // recuperamos sus datos inmediatamente.
+        if (startData.existing && startData.id) {
+          const existingRes = await apiFetch(
+            `/api/workouts/${encodeURIComponent(startData.id)}?user_id=${encodeURIComponent(user.id)}`
+          );
+
+          if (!existingRes.ok) {
+            throw new Error('No se pudo recuperar el entrenamiento en curso');
+          }
+
+          startData = await existingRes.json();
+          setLoggedSets(Array.isArray(startData.sets) ? startData.sets : []);
+        } else {
+          setLoggedSets([]);
+        }
+      }
+
       setWorkoutLog(startData);
+
+      // El cronómetro debe continuar desde el inicio real de la sesión.
+      if (startData.date) {
+        const startedAt = new Date(startData.date).getTime();
+        if (!Number.isNaN(startedAt)) {
+          setElapsedSeconds(
+            Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
+          );
+        }
+      }
 
       // 2. Fetch routine with exercise list and last performance
       const routRes = await apiFetch(`/api/routines/${routineId}/with-last-performance?user_id=${encodeURIComponent(user.id)}`);
       if (!routRes.ok) throw new Error('Error al cargar datos de rutina');
       const routData = await routRes.json();
       setRoutine(routData.routine || routData);
-      setExercises(
-        (routData.exercises || []).map((item: any) => {
+
+      const loadedExercises = (routData.exercises || []).map((item: any) => {
           const sourceExercise = item.exercise || {};
 
           const exercise = {
@@ -154,8 +213,29 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
             target_rir: item.target_rir ?? item.target?.rir,
             rest_seconds: item.rest_seconds ?? item.target?.rest_seconds,
           };
-        })
-      );
+        });
+
+      setExercises(loadedExercises);
+
+      // Recuperar exactamente el ejercicio que estaba activo antes
+      // de refrescar o cambiar de dispositivo.
+      if (startData.current_exercise_id) {
+        const restoredIndex = loadedExercises.findIndex(
+          (item: any) =>
+            item.exercise?.id === startData.current_exercise_id ||
+            item.exercise_id === startData.current_exercise_id ||
+            item.id === startData.current_exercise_id
+        );
+
+        if (restoredIndex >= 0) {
+          setActiveExIndex(restoredIndex);
+        } else {
+          // Si el ejercicio ya no pertenece a la rutina, usamos el primero.
+          setActiveExIndex(0);
+        }
+      } else {
+        setActiveExIndex(0);
+      }
 
       // 3. Fetch recommendations for the progression rule
       const recsRes = await apiFetch(`/api/routines/${routineId}/recommendations?user_id=${encodeURIComponent(user.id)}`);
@@ -167,6 +247,62 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
       setError(err.message || 'Error al iniciar sesión.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const persistCurrentExercise = async (exerciseId: string) => {
+    if (!workoutLog?.id || !user?.id) return;
+
+    try {
+      const response = await apiFetch(
+        `/api/workouts/${encodeURIComponent(workoutLog.id)}?user_id=${encodeURIComponent(user.id)}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            status: workoutLog.status,
+            duration_minutes: workoutLog.duration_minutes ?? null,
+            notes: workoutLog.notes ?? null,
+            current_exercise_id: exerciseId,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        console.error(
+          '[WorkoutActive] No se pudo guardar el ejercicio actual:',
+          response.status
+        );
+        return;
+      }
+
+      setWorkoutLog(prev =>
+        prev
+          ? {
+              ...prev,
+              current_exercise_id: exerciseId,
+            }
+          : prev
+      );
+    } catch (error) {
+      console.error(
+        '[WorkoutActive] Error guardando el ejercicio actual:',
+        error
+      );
+    }
+  };
+
+  const selectExercise = (index: number) => {
+    if (index < 0 || index >= exercises.length) return;
+
+    setActiveExIndex(index);
+
+    const exerciseId = exercises[index]?.exercise?.id;
+
+    if (exerciseId) {
+      void persistCurrentExercise(exerciseId);
     }
   };
 
@@ -182,14 +318,40 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     const lastPerf = activeExerciseItem.last_performance;
 
     if (rec) {
-      setInputWeight(rec.recommended_weight_kg.toString());
-      setInputReps(rec.recommended_reps.toString());
+      // El backend usa recommended_rep_target.
+      // recommended_weight_kg puede ser null cuando no existe histórico.
+      const recommendedWeight = rec.recommended_weight_kg;
+      const recommendedReps =
+        rec.recommended_rep_target ??
+        rec.recommended_reps ??
+        activeExerciseItem.target_rep_min;
+
+      setInputWeight(
+        recommendedWeight != null
+          ? String(recommendedWeight)
+          : isTimedExercise(activeExerciseItem)
+            ? '0'
+            : '20'
+      );
+
+      setInputReps(
+        recommendedReps != null
+          ? String(recommendedReps)
+          : '1'
+      );
     } else if (lastPerf && lastPerf.sets.length > 0) {
-      setInputWeight(lastPerf.sets[0].weight_kg.toString());
-      setInputReps(lastPerf.sets[0].reps.toString());
+      const lastWeight = lastPerf.sets[0].weight_kg;
+      const lastReps = lastPerf.sets[0].reps;
+
+      setInputWeight(lastWeight != null ? String(lastWeight) : '20');
+      setInputReps(lastReps != null ? String(lastReps) : '1');
     } else {
-      setInputWeight(isTimedExercise(activeExerciseItem) ? '0' : '20'); // 20kg bar or 0 for plancha
-      setInputReps(activeExerciseItem.target_rep_min.toString());
+      setInputWeight(isTimedExercise(activeExerciseItem) ? '0' : '20');
+      setInputReps(
+        activeExerciseItem.target_rep_min != null
+          ? String(activeExerciseItem.target_rep_min)
+          : '1'
+      );
     }
     
     setIsWarmup(false);
@@ -210,6 +372,12 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     setError(null);
 
     try {
+      // El backend exige set_number.
+      // Calculamos el siguiente número únicamente para
+      // el ejercicio activo.
+      const nextSetNumber =
+        loggedSets.filter(s => s.exercise_id === activeExercise.id).length + 1;
+
       const res = await apiFetch(`/api/workouts/${workoutLog.id}/sets?user_id=${encodeURIComponent(user.id)}`, {
         method: 'POST',
         headers: {
@@ -217,9 +385,10 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
         },
         body: JSON.stringify({
           exercise_id: activeExercise.id,
+          set_number: nextSetNumber,
           weight_kg: weight,
           reps: reps,
-          rir: inputRir === 'N/A' ? null : parseInt(inputRir),
+          rir: isWarmup || inputRir === 'N/A' ? null : parseInt(inputRir),
           is_warmup: isWarmup,
           notes: setNote
         })
@@ -265,7 +434,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     }
   };
 
-  const handleFinishWorkout = async (status: 'completed' | 'cancelled') => {
+  const handleFinishWorkout = async () => {
     if (!workoutLog) return;
     setSubmittingWorkout(true);
     setError(null);
@@ -277,9 +446,10 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          status: status,
+          status: 'completed',
           duration_minutes: Math.max(1, Math.round(elapsedSeconds / 60)),
-          notes: status === 'completed' ? finishNotes : 'Cancelado por el usuario.'
+          notes: finishNotes,
+          current_exercise_id: workoutLog.current_exercise_id ?? null,
         })
       });
 
@@ -292,6 +462,34 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
     } catch (err: any) {
       setError(err.message || 'Error al guardar entrenamiento.');
       setShowFinishModal(false);
+    } finally {
+      setSubmittingWorkout(false);
+    }
+  };
+
+  const handleCancelWorkout = async () => {
+    if (!workoutLog) return;
+    setSubmittingWorkout(true);
+    setError(null);
+
+    try {
+      const res = await apiFetch(
+        `/api/workouts/${encodeURIComponent(workoutLog.id)}?user_id=${encodeURIComponent(user.id)}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || data.error || 'No se pudo cancelar el entrenamiento');
+      }
+
+      setShowCancelConfirm(false);
+      onWorkoutExit();
+    } catch (err: any) {
+      setError(err.message || 'Error al cancelar el entrenamiento.');
+      setShowCancelConfirm(false);
     } finally {
       setSubmittingWorkout(false);
     }
@@ -400,7 +598,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
   const activeRec = recommendations.find(r => r.exercise_id === activeExercise?.id);
 
   return (
-    <div id="active-workout-panel" className="min-h-screen bg-neutral-950 text-neutral-100 pb-32 max-w-md mx-auto select-none relative">
+    <div id="active-workout-panel" className="min-h-screen w-full bg-neutral-950 text-neutral-100 pb-8 max-w-md mx-auto select-none relative">
       
       {/* Upper sticky header with timer */}
       <div className="sticky top-0 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-900 px-4 py-3.5 z-30 flex items-center justify-between">
@@ -440,7 +638,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
                 <button
                   key={re.id}
                   id={`ex-tab-${idx}`}
-                  onClick={() => setActiveExIndex(idx)}
+                  onClick={() => selectExercise(idx)}
                   className={`snap-center flex items-center gap-1.5 shrink-0 px-4 py-3 rounded-xl border text-xs font-bold transition-all relative ${
                     isSelected 
                       ? 'bg-neutral-900 border-lime-400 text-white' 
@@ -473,7 +671,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
 
         {/* Current Active Exercise details card */}
         {activeExercise && (
-          <div id="active-exercise-card" className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-lg space-y-4">
+          <div id="active-exercise-card" className="scroll-mt-20 bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-lg space-y-4">
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-[10px] font-bold text-lime-400 uppercase tracking-widest">{activeExercise.target_muscle}</span>
@@ -519,7 +717,26 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
                   {activeExerciseItem.last_performance && activeExerciseItem.last_performance.sets.length > 0 ? (
                     isTimedExercise(activeExerciseItem)
                       ? `${activeExerciseItem.last_performance.sets.map(s => `${s.reps}s`).join('/')}`
-                      : `${activeExerciseItem.last_performance.sets[0].weight_kg}kg × ${activeExerciseItem.last_performance.sets.filter(s => !s.is_warmup).map(s => s.reps).join('/')}`
+                      : (() => {
+                          const workingSets = activeExerciseItem.last_performance.sets.filter(
+                            s => !s.is_warmup
+                          );
+
+                          if (workingSets.length === 0) return '--';
+
+                          const firstWeight = workingSets[0].weight_kg;
+                          const sameWeight = workingSets.every(
+                            s => s.weight_kg === firstWeight
+                          );
+
+                          if (sameWeight) {
+                            return `${firstWeight}kg × ${workingSets.map(s => s.reps).join('/')}`;
+                          }
+
+                          return workingSets
+                            .map(s => `${s.weight_kg}kg × ${s.reps}`)
+                            .join(' · ');
+                        })()
                   ) : (
                     '--'
                   )}
@@ -537,8 +754,8 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
                   <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">Progresión Recomendada</h4>
                   <p className="text-[11px] text-lime-400 font-bold mt-1">
                     {isTimedExercise(activeExerciseItem)
-                      ? `Intenta aguantar ${activeRec.recommended_reps} segundos en plancha`
-                      : `Usa ${activeRec.recommended_weight_kg} kg · apunta a ${activeRec.recommended_reps} reps`
+                      ? `Intenta aguantar ${activeRec.recommended_rep_target} segundos en plancha`
+                      : `Usa ${activeRec.recommended_weight_kg} kg · apunta a ${activeRec.recommended_rep_target} reps`
                     }
                   </p>
                   <p className="text-[10px] text-neutral-400 mt-1 leading-relaxed">{activeRec.reason}</p>
@@ -639,9 +856,12 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
                 <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">RIR (Esfuerzo)</label>
                 <select
                   id="select-rir"
-                  value={inputRir}
+                  value={isWarmup ? 'N/A' : inputRir}
                   onChange={(e) => setInputRir(e.target.value)}
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl py-2.5 px-3.5 text-white text-xs font-bold focus:outline-none focus:border-lime-500"
+                  disabled={isWarmup}
+                  className={`w-full bg-neutral-950 border border-neutral-800 rounded-xl py-2.5 px-3.5 text-xs font-bold focus:outline-none focus:border-lime-500 ${
+                    isWarmup ? 'text-neutral-600 opacity-60 cursor-not-allowed' : 'text-white'
+                  }`}
                   style={{ minHeight: '38px' }}
                 >
                   <option value="0">RIR 0 (Fallo)</option>
@@ -658,7 +878,13 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
                 <button
                   id="btn-toggle-warmup"
                   type="button"
-                  onClick={() => setIsWarmup(!isWarmup)}
+                  onClick={() => {
+                    setIsWarmup((current) => {
+                      const next = !current;
+                      setInputRir(next ? 'N/A' : '2');
+                      return next;
+                    });
+                  }}
                   className={`w-full font-bold py-2.5 px-3 rounded-xl text-xs transition-all border flex items-center justify-center gap-1.5 ${
                     isWarmup
                       ? 'bg-yellow-400/10 border-yellow-400/30 text-yellow-400'
@@ -766,7 +992,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
           <button
             id="btn-workout-prev-ex"
             disabled={activeExIndex === 0}
-            onClick={() => setActiveExIndex(prev => prev - 1)}
+            onClick={() => selectExercise(activeExIndex - 1)}
             className="flex items-center gap-1.5 text-xs font-bold text-neutral-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none py-2"
             style={{ minHeight: '44px' }}
           >
@@ -781,7 +1007,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
           <button
             id="btn-workout-next-ex"
             disabled={activeExIndex === exercises.length - 1}
-            onClick={() => setActiveExIndex(prev => prev + 1)}
+            onClick={() => selectExercise(activeExIndex + 1)}
             className="flex items-center gap-1.5 text-xs font-bold text-neutral-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none py-2"
             style={{ minHeight: '44px' }}
           >
@@ -790,8 +1016,21 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
           </button>
         </div>
 
+        {/* Exit Workout button */}
+        <div className="pt-8 flex justify-center">
+          <button
+            id="btn-exit-workout"
+            type="button"
+            onClick={onWorkoutExit}
+            className="text-neutral-400 hover:text-white font-bold text-xs uppercase tracking-wider py-2 px-4 rounded-xl transition-all hover:bg-neutral-800/60"
+            style={{ minHeight: '44px' }}
+          >
+            <span>Salir</span>
+          </button>
+        </div>
+
         {/* Cancel Workout button */}
-        <div className="pt-8 text-center">
+        <div className="pt-2 text-center">
           <button
             id="btn-cancel-workout"
             type="button"
@@ -973,7 +1212,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
               <button
                 id="btn-finish-confirm-submit"
                 type="button"
-                onClick={() => handleFinishWorkout('completed')}
+                onClick={handleFinishWorkout}
                 disabled={submittingWorkout}
                 className="bg-gradient-to-r from-lime-400 to-emerald-500 text-black font-extrabold py-3 px-4 rounded-xl text-xs transition-all shadow-lg active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
                 style={{ minHeight: '44px' }}
@@ -1003,7 +1242,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
               </div>
               <h3 className="text-lg font-black text-white">¿Cancelar Entrenamiento?</h3>
               <p className="text-xs text-neutral-400 leading-relaxed">
-                ¿Seguro que deseas cancelar el entrenamiento? Todos los datos y series registrados en esta sesión se perderán de manera permanente.
+                Se eliminarán permanentemente esta sesión y todas las series registradas. Esta acción no se puede deshacer.
               </p>
             </div>
 
@@ -1021,8 +1260,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
                 id="btn-cancel-confirm-workout"
                 type="button"
                 onClick={() => {
-                  setShowCancelConfirm(false);
-                  handleFinishWorkout('cancelled');
+                  handleCancelWorkout();
                 }}
                 disabled={submittingWorkout}
                 className="bg-red-500 hover:bg-red-650 text-white font-extrabold py-3 px-4 rounded-xl text-xs transition-all shadow-lg active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
@@ -1031,7 +1269,7 @@ export default function WorkoutActive({ user, routineId, onWorkoutFinished, onOp
                 {submittingWorkout ? (
                   <Loader className="animate-spin" size={14} />
                 ) : (
-                  <span>Sí, cancelar</span>
+                  <span>Sí, eliminar</span>
                 )}
               </button>
             </div>

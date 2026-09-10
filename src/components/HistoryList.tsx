@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Timer, Dumbbell, ChevronDown, ChevronUp, Loader, AlertTriangle, Info } from 'lucide-react';
+import { Calendar, Timer, Dumbbell, ChevronDown, ChevronUp, Loader, AlertTriangle, Info, Trash2 } from 'lucide-react';
 import { WorkoutLog, WorkoutSet, Exercise } from '../types';
 import { apiFetch } from '../lib/api';
 
@@ -61,6 +61,45 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
   const toggleExpand = (id: string) => {
     setExpandedWorkoutId(expandedWorkoutId === id ? null : id);
   };
+
+  const handleDeleteWorkout = async (workout: WorkoutLog) => {
+    const routineName = workout.routine_name || 'este entrenamiento';
+
+    const confirmed = window.confirm(
+      `¿Seguro que quieres eliminar ${routineName} del ${new Date(workout.date).toLocaleDateString('es-ES')}?\n\nEsta acción eliminará también todas las series registradas y no se puede deshacer.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setError(null);
+
+      const res = await apiFetch(
+        `/api/workouts/${encodeURIComponent(workout.id)}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          data?.detail || 'Error al eliminar el entrenamiento'
+        );
+      }
+
+      setWorkouts((current) =>
+        current.filter((item) => item.id !== workout.id)
+      );
+
+      if (expandedWorkoutId === workout.id) {
+        setExpandedWorkoutId(null);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error al eliminar el entrenamiento.');
+    }
+  };
+
 
   const calculateTotalVolume = (sets: WorkoutSet[] | undefined) => {
     if (!sets) return 0;
@@ -170,12 +209,33 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
                     </div>
                   </div>
 
-                  <button
-                    id={`btn-expand-workout-${workout.id}`}
-                    className="p-1.5 rounded-lg bg-neutral-950 border border-neutral-850 text-neutral-400 group-hover:text-white"
-                  >
-                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      id={`btn-delete-workout-${workout.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteWorkout(workout);
+                      }}
+                      className="p-1.5 rounded-lg bg-neutral-950 border border-neutral-850 text-neutral-500 hover:text-red-400 hover:border-red-900/60 transition-colors"
+                      title="Eliminar entrenamiento"
+                      aria-label="Eliminar entrenamiento"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+
+                    <button
+                      id={`btn-expand-workout-${workout.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand(workout.id);
+                      }}
+                      className="p-1.5 rounded-lg bg-neutral-950 border border-neutral-850 text-neutral-400 hover:text-white"
+                      title={isExpanded ? 'Contraer' : 'Ver detalles'}
+                      aria-label={isExpanded ? 'Contraer' : 'Ver detalles'}
+                    >
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Expanded sets summary lists */}

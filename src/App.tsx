@@ -13,6 +13,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('home');
   const [activeRoutineId, setActiveRoutineId] = useState<string | null>(null);
+  const [activeWorkoutId, setActiveWorkoutId] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [isExerciseInfoOpen, setIsExerciseInfoOpen] = useState(false);
@@ -104,6 +105,24 @@ export default function App() {
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
+
+          // Recuperar automáticamente una sesión que quedó en curso.
+          try {
+            const workoutResponse = await fetch("/api/workouts/in-progress", {
+              credentials: "include",
+            });
+
+            if (workoutResponse.ok) {
+              const activeWorkout = await workoutResponse.json();
+
+              if (activeWorkout?.id && activeWorkout?.routine_id) {
+                setActiveWorkoutId(activeWorkout.id);
+                setActiveRoutineId(activeWorkout.routine_id);
+              }
+            }
+          } catch (workoutError) {
+            console.error("Active workout restore error:", workoutError);
+          }
         } else {
           setUser(null);
         }
@@ -172,9 +191,16 @@ export default function App() {
         <WorkoutActive
           user={user}
           routineId={activeRoutineId}
+          existingWorkoutId={activeWorkoutId}
           onWorkoutFinished={() => {
+            setActiveWorkoutId(null);
             setActiveRoutineId(null);
             setActiveTab('history'); // direct to history after finish
+          }}
+          onWorkoutExit={() => {
+            setActiveWorkoutId(null);
+            setActiveRoutineId(null);
+            setActiveTab('home');
           }}
           onOpenExerciseInfo={handleOpenExerciseInfo}
         />
@@ -193,7 +219,10 @@ export default function App() {
       {activeTab === 'home' && (
         <Dashboard
           user={user}
-          onStartWorkout={(id) => setActiveRoutineId(id)}
+          onStartWorkout={(id) => {
+            setActiveWorkoutId(null);
+            setActiveRoutineId(id);
+          }}
           onNavigateToTab={(tab) => setActiveTab(tab)}
           onOpenExerciseInfo={handleOpenExerciseInfo}
         />
