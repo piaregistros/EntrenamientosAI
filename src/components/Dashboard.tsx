@@ -14,6 +14,7 @@ interface DashboardProps {
 export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpenExerciseInfo }: DashboardProps) {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [lastWorkout, setLastWorkout] = useState<WorkoutLog | null>(null);
+  const [activeWorkout, setActiveWorkout] = useState<WorkoutLog | null>(null);
   const [metrics, setMetrics] = useState<BodyMetric[]>([]);
   const [weightInput, setWeightInput] = useState('');
   const [loggingWeight, setLoggingWeight] = useState(false);
@@ -160,7 +161,23 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
 
       setLastWorkout(completed.length > 0 ? completed[0] : null);
 
-      // 3. Métricas corporales
+      // 3. Entrenamiento actualmente en curso
+      const activeRes = await apiFetch(
+        `/api/workouts/in-progress?user_id=${encodeURIComponent(user.id)}`
+      );
+
+      if (!activeRes.ok) {
+        throw new Error('Error al comprobar entrenamiento en curso');
+      }
+
+      const activeData = await activeRes.json();
+      setActiveWorkout(
+        activeData && activeData.status === 'in_progress'
+          ? activeData
+          : null
+      );
+
+      // 4. Métricas corporales
       const metricRes = await apiFetch(
         `/api/body-metrics?user_id=${encodeURIComponent(user.id)}`
       );
@@ -241,7 +258,6 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
   };
 
   const recommendedRoutine = getNextRecommendedRoutine();
-  const latestWeight = metrics.length > 0 ? metrics[0].weight_kg : null;
 
   if (loading) {
     return (
@@ -264,6 +280,63 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
           {user.role === 'admin' ? 'Administrador' : 'Atleta'}
         </div>
       </div>
+
+      {/* Active Workout Widget */}
+      {activeWorkout && activeWorkout.routine_id && (
+        <div
+          id="active-workout-card"
+          className="bg-lime-500/10 border border-lime-400/40 rounded-2xl p-5 shadow-xl space-y-4 ring-1 ring-lime-500/10"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-lime-500/15 border border-lime-500/25 flex items-center justify-center text-lime-400">
+                <Dumbbell size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-lime-400 uppercase tracking-wide">
+                  Entrenamiento en curso
+                </h4>
+                <p className="text-[10px] text-neutral-400">
+                  Sesión guardada automáticamente
+                </p>
+              </div>
+            </div>
+
+            <span className="w-2.5 h-2.5 rounded-full bg-lime-400 animate-pulse" />
+          </div>
+
+          <div className="space-y-1">
+            <h5 className="text-base font-extrabold text-white">
+              {activeWorkout.routine_name || 'Entrenamiento'}
+            </h5>
+            <p className="text-[11px] text-neutral-400">
+              Iniciado el{' '}
+              {new Date(activeWorkout.date).toLocaleDateString('es-ES', {
+                day: 'numeric',
+                month: 'short',
+              })}{' '}
+              a las{' '}
+              {new Date(activeWorkout.date).toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+          </div>
+
+          <button
+            id="btn-resume-active-workout"
+            type="button"
+            onClick={() => onStartWorkout(activeWorkout.routine_id!)}
+            className="w-full bg-lime-400 hover:bg-lime-300 text-black font-extrabold py-3 px-4 rounded-xl text-xs transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
+            style={{ minHeight: '44px' }}
+          >
+            <Play size={14} fill="currentColor" />
+            <span>Continuar entrenamiento</span>
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+
 
       {error && (
         <div id="dashboard-error" className="bg-red-950/40 border border-red-900/50 text-red-300 p-4 rounded-xl text-xs flex gap-3">
@@ -327,60 +400,12 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
               onClick={() => setSelectedRoutineForPreview(routine)}
               className="bg-neutral-900 border border-neutral-800 hover:border-neutral-700 p-3.5 rounded-xl flex flex-col justify-between items-start transition-all active:scale-95 text-left h-24 relative"
             >
-              <span className="text-[10px] font-bold text-lime-400 uppercase tracking-wide">Día {routine.day_order}</span>
+              <span className="text-[10px] font-bold text-lime-400 uppercase tracking-wide">Rutina {routine.day_order}</span>
               <span className="text-sm font-extrabold text-white leading-tight">{routine.name}</span>
               <span className="text-[9px] text-neutral-500 mt-1 block">Toca para ver</span>
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Quick Weight Tracker */}
-      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-lg">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-400">
-              <Scale size={16} />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wide">Peso Corporal</h4>
-              <p className="text-[10px] text-neutral-500">Log de progreso físico</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="text-lg font-black text-white">{latestWeight ? `${latestWeight} kg` : '-- kg'}</span>
-            <span className="text-[9px] text-neutral-500 block">último registro</span>
-          </div>
-        </div>
-
-        <form onSubmit={handleLogWeight} className="flex gap-2">
-          <input
-            id="dashboard-weight-input"
-            type="number"
-            step="0.1"
-            placeholder="Ej: 71.8"
-            value={weightInput}
-            onChange={(e) => setWeightInput(e.target.value)}
-            disabled={loggingWeight}
-            className="flex-1 bg-neutral-950/60 border border-neutral-800 rounded-xl py-2.5 px-3 text-white text-xs placeholder-neutral-600 focus:outline-none focus:border-lime-500 transition-all"
-          />
-          <button
-            id="dashboard-weight-submit"
-            type="submit"
-            disabled={loggingWeight}
-            className="bg-neutral-800 hover:bg-neutral-700 text-lime-400 border border-neutral-700/50 font-bold px-4 rounded-xl text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5"
-            style={{ minHeight: '38px' }}
-          >
-            {loggingWeight ? (
-              <Loader className="animate-spin" size={12} />
-            ) : (
-              <>
-                <Plus size={14} />
-                <span>Grabar</span>
-              </>
-            )}
-          </button>
-        </form>
       </div>
 
       {/* Last Session Review Widget */}
