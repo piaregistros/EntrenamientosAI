@@ -10,11 +10,28 @@ function copyResponseHeaders(
   response: Response,
   res: express.Response
 ) {
+  const headersWithCookies = response.headers as Headers & {
+    getSetCookie?: () => string[];
+  };
+
+  const setCookies = headersWithCookies.getSetCookie
+    ? headersWithCookies.getSetCookie()
+    : [];
+
   response.headers.forEach((value, key) => {
-    if (key.toLowerCase() !== "transfer-encoding") {
+    const normalizedKey = key.toLowerCase();
+
+    if (
+      normalizedKey !== "transfer-encoding" &&
+      normalizedKey !== "set-cookie"
+    ) {
       res.setHeader(key, value);
     }
   });
+
+  if (setCookies.length > 0) {
+    res.setHeader("set-cookie", setCookies);
+  }
 }
 
 app.use(async (req, res, next) => {

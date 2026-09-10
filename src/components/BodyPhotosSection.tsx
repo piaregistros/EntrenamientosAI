@@ -130,7 +130,7 @@ export default function BodyPhotosSection({ user }: BodyPhotosSectionProps) {
       const res = await apiFetch(`/api/body/photos?user_id=${targetUserId}`);
       if (!res.ok) throw new Error('Error al cargar historial de fotografías');
       const data = await res.json();
-      setPhotos(data);
+      setPhotos(Array.isArray(data) ? data : (Array.isArray(data.photos) ? data.photos : []));
     } catch (err: any) {
       setError(err.message || 'Error de conexión con el servidor.');
     } finally {
@@ -175,7 +175,7 @@ export default function BodyPhotosSection({ user }: BodyPhotosSectionProps) {
         if (res.status === 409) {
           throw new Error('Ya existe una fotografía para este ángulo en este mes.');
         }
-        throw new Error(data.error || 'No se pudo subir la fotografía.');
+        throw new Error(data.detail || data.error || 'No se pudo subir la fotografía.');
       }
 
       setSuccess('¡Fotografía subida con éxito!');
@@ -200,7 +200,7 @@ export default function BodyPhotosSection({ user }: BodyPhotosSectionProps) {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'No se pudo eliminar el archivo.');
+        throw new Error(data.detail || data.error || 'No se pudo eliminar el archivo.');
       }
 
       setSuccess('Fotografía eliminada con éxito.');
@@ -250,7 +250,7 @@ export default function BodyPhotosSection({ user }: BodyPhotosSectionProps) {
 
       const data = await uploadRes.json();
       if (!uploadRes.ok) {
-        throw new Error(data.error || 'Error al subir la nueva versión.');
+        throw new Error(data.detail || data.error || 'Error al subir la nueva versión.');
       }
 
       setSuccess('Fotografía reemplazada con éxito.');
@@ -323,9 +323,9 @@ export default function BodyPhotosSection({ user }: BodyPhotosSectionProps) {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => setTargetUserId('pablo')}
+              onClick={() => setTargetUserId('1effca7d-97cf-41f2-a930-9ce482972f02')}
               className={`py-2 px-3.5 rounded-xl text-xs font-extrabold transition-all border ${
-                targetUserId === 'pablo'
+                targetUserId === '1effca7d-97cf-41f2-a930-9ce482972f02'
                   ? 'bg-lime-500/10 border-lime-500 text-lime-400'
                   : 'bg-neutral-950/40 border-neutral-800 text-neutral-400 hover:text-neutral-200'
               }`}
@@ -333,9 +333,9 @@ export default function BodyPhotosSection({ user }: BodyPhotosSectionProps) {
               Pablo (Admin)
             </button>
             <button
-              onClick={() => setTargetUserId('estefi')}
+              onClick={() => setTargetUserId('2bf9e2da-6314-46c3-95cd-edbaf1d13b9c')}
               className={`py-2 px-3.5 rounded-xl text-xs font-extrabold transition-all border ${
-                targetUserId === 'estefi'
+                targetUserId === '2bf9e2da-6314-46c3-95cd-edbaf1d13b9c'
                   ? 'bg-lime-500/10 border-lime-500 text-lime-400'
                   : 'bg-neutral-950/40 border-neutral-800 text-neutral-400 hover:text-neutral-200'
               }`}

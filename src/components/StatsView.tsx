@@ -13,7 +13,7 @@ export default function StatsView({ user }: StatsViewProps) {
   const [statsSummary, setStatsSummary] = useState<WorkoutStats | null>(null);
   const [prs, setPrs] = useState<PRRecord[]>([]);
   const [exercisesList, setExercisesList] = useState<any[]>([]);
-  const [selectedExId, setSelectedExId] = useState<string>('ex-10'); // Default to Press Banca Plano
+  const [selectedExId, setSelectedExId] = useState<string>('');
   const [exHistory, setExHistory] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
@@ -36,13 +36,13 @@ export default function StatsView({ user }: StatsViewProps) {
     setError(null);
     try {
       // 1. Fetch summary stats
-      const sumRes = await apiFetch('/api/stats/summary');
+      const sumRes = await apiFetch(`/api/stats/summary?user_id=${encodeURIComponent(user.id)}`);
       if (!sumRes.ok) throw new Error('Error al cargar resumen estadístico');
       const sumData = await sumRes.json();
       setStatsSummary(sumData);
 
       // 2. Fetch personal records
-      const prRes = await apiFetch('/api/stats/prs');
+      const prRes = await apiFetch(`/api/stats/prs?user_id=${encodeURIComponent(user.id)}`);
       if (!prRes.ok) throw new Error('Error al cargar records personales (PRs)');
       const prData = await prRes.json();
       setPrs(prData);
@@ -51,7 +51,19 @@ export default function StatsView({ user }: StatsViewProps) {
       const exRes = await apiFetch('/api/exercises');
       if (exRes.ok) {
         const exData = await exRes.json();
-        setExercisesList(exData);
+        const exercises = Array.isArray(exData)
+          ? exData
+          : (Array.isArray(exData.exercises) ? exData.exercises : []);
+
+        setExercisesList(exercises);
+
+        if (exercises.length > 0) {
+          setSelectedExId((current) =>
+            current && exercises.some((ex: any) => ex.id === current)
+              ? current
+              : exercises[0].id
+          );
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Error al conectar con el servidor.');
@@ -63,10 +75,10 @@ export default function StatsView({ user }: StatsViewProps) {
   const fetchExerciseHistory = async (exerciseId: string) => {
     setLoadingHistory(true);
     try {
-      const res = await apiFetch(`/api/stats/exercise/${exerciseId}`);
+      const res = await apiFetch(`/api/stats/exercise/${exerciseId}?user_id=${encodeURIComponent(user.id)}`);
       if (res.ok) {
         const data = await res.json();
-        setExHistory(data);
+        setExHistory(Array.isArray(data) ? data : (Array.isArray(data.history) ? data.history : []));
       }
     } catch (e) {
       console.error('Error fetching exercise history', e);
