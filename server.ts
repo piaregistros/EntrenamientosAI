@@ -3,7 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
 const API_TARGET = "http://127.0.0.1:8000";
 const COACH_TARGET = "http://127.0.0.1:8001";
 
