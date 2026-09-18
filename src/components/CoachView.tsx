@@ -49,7 +49,12 @@ export default function CoachView({ user }: { user: any }) {
   );
 
   useEffect(() => { loadConversations(); loadMemories(); }, []);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 20);
+    return () => window.clearTimeout(id);
+  }, [messages, loading]);
 
   async function loadConversations() {
     setLoadingHistory(true);
@@ -105,6 +110,8 @@ export default function CoachView({ user }: { user: any }) {
     const startedAt = Date.now();
     setMessagesByMode(prev => ({ ...prev, [mode]: [...prev[mode], optimistic] }));
     setLoading(true);
+    // Give React one paint so "Pensando…" is visible even when the local model answers quickly.
+    await new Promise(resolve => setTimeout(resolve, 60));
     try {
       const res = await apiFetch('/api/coach/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -114,7 +121,7 @@ export default function CoachView({ user }: { user: any }) {
       if (!res.ok) throw new Error(data.detail || 'El Coach no ha podido responder');
 
       // Keep the thinking indicator visible briefly even when Qwen answers very fast.
-      const remaining = 500 - (Date.now() - startedAt);
+      const remaining = 900 - (Date.now() - startedAt);
       if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining));
 
       setConversationIds(prev => ({ ...prev, [mode]: data.conversation_id }));
@@ -181,7 +188,7 @@ export default function CoachView({ user }: { user: any }) {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 pt-5">
+      <main className="max-w-3xl mx-auto px-4 pt-5 pb-44">
         {error && <div className="mb-4 rounded-2xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">{error}</div>}
 
         {messages.length === 0 ? (
@@ -200,7 +207,7 @@ export default function CoachView({ user }: { user: any }) {
             {currentConversation && <div className="text-center text-[10px] uppercase tracking-widest text-neutral-600">{currentConversation.title}</div>}
             {messages.map((m, i) => <div key={m.id || i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`${m.role === 'user' ? 'bg-lime-400 text-neutral-950 rounded-2xl rounded-br-md max-w-[88%]' : 'bg-neutral-900 border border-neutral-800 text-neutral-200 rounded-2xl rounded-bl-md max-w-[94%]'} px-4 py-3.5 text-sm leading-6 whitespace-pre-wrap`}>{m.content}</div></div>)}
             {loading && <div className="flex justify-start"><div className="rounded-2xl rounded-bl-md border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-neutral-500 flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-lime-400 animate-pulse"/><span className="h-2 w-2 rounded-full bg-lime-400 animate-pulse [animation-delay:150ms]"/><span className="h-2 w-2 rounded-full bg-lime-400 animate-pulse [animation-delay:300ms]"/>Pensando…</div></div>}
-            <div ref={endRef}/>
+            <div ref={endRef} style={{ scrollMarginBottom: '180px' }}/>
           </div>
         )}
       </main>
