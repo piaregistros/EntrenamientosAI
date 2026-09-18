@@ -25,8 +25,12 @@ const starters = [
 export default function CoachView({ user }: { user: any }) {
   const [mode, setMode] = useState<Mode>('coach');
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [conversationIds, setConversationIds] = useState<Record<Mode, string | null>>({
+    coach: null, plan: null, nutrition: null, recovery: null,
+  });
+  const [messagesByMode, setMessagesByMode] = useState<Record<Mode, Message[]>>({
+    coach: [], plan: [], nutrition: [], recovery: [],
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -37,7 +41,12 @@ export default function CoachView({ user }: { user: any }) {
   const [newMemory, setNewMemory] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
 
-  const currentConversation = useMemo(() => conversations.find(c => c.id === conversationId), [conversations, conversationId]);
+  const conversationId = conversationIds[mode];
+  const messages = messagesByMode[mode] || [];
+  const currentConversation = useMemo(
+    () => conversations.find(c => c.id === conversationId),
+    [conversations, conversationId]
+  );
 
   useEffect(() => { loadConversations(); loadMemories(); }, []);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
@@ -65,15 +74,27 @@ export default function CoachView({ user }: { user: any }) {
       const res = await apiFetch(`/api/coach/conversations/${id}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'No se pudo abrir');
-      setConversationId(id);
-      setMessages(data.messages || []);
-      setMode((data.conversation?.mode || 'coach') as Mode);
+      const openedMode = (data.conversation?.mode || 'coach') as Mode;
+      setConversationIds(prev => ({ ...prev, [openedMode]: id }));
+      setMessagesByMode(prev => ({ ...prev, [openedMode]: data.messages || [] }));
+      setMode(openedMode);
       setShowHistory(false);
     } catch (e: any) { setError(e.message); }
   }
 
   function newConversation() {
-    setConversationId(null); setMessages([]); setInput(''); setError(null); setShowHistory(false);
+    setConversationIds(prev => ({ ...prev, [mode]: null }));
+    setMessagesByMode(prev => ({ ...prev, [mode]: [] }));
+    setInput('');
+    setError(null);
+    setShowHistory(false);
+  }
+
+  function switchMode(nextMode: Mode) {
+    if (loading) return;
+    setMode(nextMode);
+    setInput('');
+    setError(null);
   }
 
   async function sendMessage(text = input) {
@@ -81,7 +102,9 @@ export default function CoachView({ user }: { user: any }) {
     if (!message || loading) return;
     setInput(''); setError(null);
     const optimistic: Message = { role: 'user', content: message };
-    setMessages(prev => [...prev, optimistic]); setLoading(true);
+    const startedAt = Date.now();
+    setMessagesByMode(prev => ({ ...prev, [mode]: [...prev[mode], optimistic] }));
+    setLoading(true);
     try {
       const res = await apiFetch('/api/coach/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -89,11 +112,20 @@ export default function CoachView({ user }: { user: any }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'El Coach no ha podido responder');
-      setConversationId(data.conversation_id);
-      setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
+
+      // Keep the thinking indicator visible briefly even when Qwen answers very fast.
+      const remaining = 500 - (Date.now() - startedAt);
+      if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining));
+
+      setConversationIds(prev => ({ ...prev, [mode]: data.conversation_id }));
+      setMessagesByMode(prev => ({
+        ...prev,
+        [mode]: [...prev[mode], { role: 'assistant', content: data.answer }],
+      }));
       await loadConversations();
     } catch (e: any) {
-      setMessages(prev => prev.slice(0, -1)); setError(e.message || 'Error conectando con el Coach');
+      setMessagesByMode(prev => ({ ...prev, [mode]: prev[mode].slice(0, -1) }));
+      setError(e.message || 'Error conectando con el Coach');
     } finally { setLoading(false); }
   }
 
@@ -101,7 +133,11 @@ export default function CoachView({ user }: { user: any }) {
     try {
       const res = await apiFetch(`/api/coach/conversations/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('No se pudo eliminar');
-      if (id === conversationId) newConversation();
+      const affectedMode = (Object.keys(conversationIds) as Mode[]).find(m => conversationIds[m] === id);
+      if (affectedMode) {
+        setConversationIds(prev => ({ ...prev, [affectedMode]: null }));
+        setMessagesByMode(prev => ({ ...prev, [affectedMode]: [] }));
+      }
       await loadConversations();
     } catch (e: any) { setError(e.message); }
   }
@@ -129,7 +165,7 @@ export default function CoachView({ user }: { user: any }) {
               <div className="h-11 w-11 rounded-2xl bg-lime-400 text-neutral-950 flex items-center justify-center shadow-lg shadow-lime-400/10"><Brain size={23} /></div>
               <div>
                 <div className="flex items-center gap-2"><h1 className="text-xl font-black tracking-tight">Coach</h1><span className="text-[10px] uppercase tracking-widest text-lime-400 font-bold border border-lime-400/30 rounded-full px-2 py-0.5">Qwen</span></div>
-                <p className="text-xs text-neutral-400">Tu entrenamiento, tus datos, una conversación.</p>
+                <p className="text-xs text-neutral-400">Cada área tiene su propia conversación y su historial.</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -140,7 +176,7 @@ export default function CoachView({ user }: { user: any }) {
           </div>
 
           <div className="mt-4 grid grid-cols-4 gap-1 rounded-2xl bg-neutral-900 p-1 border border-neutral-800">
-            {modes.map(item => <button key={item.id} onClick={() => setMode(item.id)} className={`rounded-xl px-2 py-2 text-[11px] font-bold transition ${mode === item.id ? 'bg-neutral-700 text-lime-400' : 'text-neutral-500 hover:text-neutral-200'}`}>{item.label}</button>)}
+            {modes.map(item => <button key={item.id} onClick={() => switchMode(item.id)} className={`rounded-xl px-2 py-2 text-[11px] font-bold transition ${mode === item.id ? 'bg-neutral-700 text-lime-400' : 'text-neutral-500 hover:text-neutral-200'}`}>{item.label}</button>)}
           </div>
         </div>
       </header>
