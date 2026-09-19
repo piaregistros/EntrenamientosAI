@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Timer, Dumbbell, ChevronDown, ChevronUp, Loader, AlertTriangle, Info, Trash2 } from 'lucide-react';
+import { Calendar, Timer, Dumbbell, ChevronDown, ChevronUp, Loader, AlertTriangle, Info, Trash2, MessageCircle } from 'lucide-react';
 import { WorkoutLog, WorkoutSet, Exercise } from '../types';
 import { apiFetch } from '../lib/api';
 
@@ -62,6 +62,114 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
     setExpandedWorkoutId(expandedWorkoutId === id ? null : id);
   };
 
+  const getWorkoutShareText = (workout: WorkoutLog) => {
+    const sets = (workout.sets ?? []).filter(set => !set.is_warmup);
+
+    const exerciseMap = new Map<string, WorkoutSet[]>();
+
+    sets.forEach(set => {
+      const current = exerciseMap.get(set.exercise_id) ?? [];
+      current.push(set);
+      exerciseMap.set(set.exercise_id, current);
+    });
+
+    const formattedDate = new Date(workout.date).toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    const exerciseLines: string[] = [];
+
+    exerciseMap.forEach(exerciseSets => {
+      const exerciseName =
+        exerciseSets[0]?.exercise_name?.trim() || 'Ejercicio';
+
+      const isTimed =
+        exerciseName.toLowerCase() === 'plancha';
+
+      const seriesText = [...exerciseSets]
+        .sort((a, b) => a.set_number - b.set_number)
+        .map(set => {
+          const base = isTimed
+            ? `${set.weight_kg} kg × ${set.reps} s`
+            : `${set.weight_kg} kg × ${set.reps}`;
+
+          return set.rir !== null
+            ? `${base} (RIR ${set.rir})`
+            : base;
+        })
+        .join(' · ');
+
+      exerciseLines.push(`• ${exerciseName}: ${seriesText}`);
+    });
+
+    const totalVolume = sets.reduce((total, set) => {
+      const isTimed =
+        set.exercise_name?.trim().toLowerCase() === 'plancha';
+
+      if (isTimed) return total;
+
+      return total +
+        (Number(set.weight_kg) || 0) *
+        (Number(set.reps) || 0);
+    }, 0);
+
+    const lines = [
+      '🏋️ ENTRENAMIENTO COMPLETADO',
+      '',
+      `📅 ${formattedDate}`,
+      `🏋️ ${workout.routine_name || 'Entrenamiento'}`,
+      `⏱️ Duración: ${workout.duration_minutes || '--'} min`,
+      `💪 Ejercicios: ${exerciseMap.size}`,
+      `🔢 Series: ${sets.length}`,
+    ];
+
+    if (totalVolume > 0) {
+      lines.push(
+        `📦 Volumen: ${Math.round(totalVolume).toLocaleString('es-ES')} kg`
+      );
+    }
+
+    if (exerciseLines.length > 0) {
+      lines.push('', ...exerciseLines);
+    }
+
+    if (workout.notes?.trim()) {
+      lines.push('', `📝 ${workout.notes.trim()}`);
+    }
+
+    lines.push('', '🔥 ¡Entrenamiento completado!');
+
+    return lines.join('\n');
+  };
+
+  const handleShareWhatsApp = async (workout: WorkoutLog) => {
+    const text = getWorkoutShareText(workout);
+    const encodedText = encodeURIComponent(text);
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile && typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: "Entrenamiento completado",
+          text,
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      }
+      return;
+    }
+
+    if (isMobile) {
+      window.location.href = "whatsapp://send?text=" + encodedText;
+      return;
+    }
+
+    window.location.href = "whatsapp://send?text=" + encodedText;
+  };
   const handleDeleteWorkout = async (workout: WorkoutLog) => {
     const routineName = workout.routine_name || 'este entrenamiento';
 
@@ -210,6 +318,21 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {workout.status === 'completed' && (
+                      <button
+                        id={`btn-share-whatsapp-${workout.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShareWhatsApp(workout);
+                        }}
+                        className="p-1.5 rounded-lg bg-neutral-950 border border-neutral-850 text-neutral-500 hover:text-green-400 hover:border-green-900/60 transition-colors"
+                        title="Compartir por WhatsApp"
+                        aria-label="Compartir por WhatsApp"
+                      >
+                        <MessageCircle size={15} />
+                      </button>
+                    )}
+
                     <button
                       id={`btn-delete-workout-${workout.id}`}
                       onClick={(e) => {

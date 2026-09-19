@@ -8,6 +8,7 @@ import StatsView from './components/StatsView';
 import ProfileView from './components/ProfileView';
 import ExerciseInfo from './components/ExerciseInfo';
 import { Exercise } from './types';
+import Onboarding from './components/Onboarding/Onboarding';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -17,6 +18,8 @@ export default function App() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [isExerciseInfoOpen, setIsExerciseInfoOpen] = useState(false);
+  const [onboardingRequired, setOnboardingRequired] = useState(false);
+  const [checkingOnboarding, setCheckingOnboarding] = useState(false);
 
   const handleOpenExerciseInfo = (exercise: Exercise) => {
     // Temporary client-side decorator for video URLs while waiting for DB migration.
@@ -105,6 +108,7 @@ export default function App() {
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
+          void checkOnboarding(userData.id);
 
           // Recuperar automáticamente una sesión que quedó en curso.
           try {
@@ -156,9 +160,31 @@ export default function App() {
     };
   }, []);
 
+  const checkOnboarding = async (userId: string) => {
+    setCheckingOnboarding(true);
+
+    try {
+      const response = await fetch("/api/onboarding", {
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setOnboardingRequired(Boolean(data.required));
+      } else {
+        console.error("Onboarding status error:", response.status);
+      }
+    } catch (error) {
+      console.error("Onboarding status error:", error);
+    } finally {
+      setCheckingOnboarding(false);
+    }
+  };
+
   const handleLoginSuccess = (userData: any) => {
     setUser(userData);
     setActiveTab("home");
+    void checkOnboarding(userData.id);
   };
 
   const handleLogout = () => {
@@ -182,6 +208,26 @@ export default function App() {
 
   if (!user) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  if (checkingOnboarding) {
+    return (
+      <div
+        id="onboarding-loading"
+        className="min-h-screen bg-neutral-950 flex items-center justify-center text-lime-400 font-bold"
+      >
+        Preparando tu experiencia...
+      </div>
+    );
+  }
+
+  if (onboardingRequired) {
+    return (
+      <Onboarding
+        user={user}
+        onComplete={() => setOnboardingRequired(false)}
+      />
+    );
   }
 
   // Active workout session takes over the entire viewport without bottom tabs

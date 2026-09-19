@@ -1,7 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { User, Lock, Trash2, KeyRound, Loader, AlertCircle, CheckCircle2, LogOut, Scale, Plus } from 'lucide-react';
+import { User, Lock, Trash2, KeyRound, Loader, AlertCircle, CheckCircle2, LogOut, Scale, Plus, Fingerprint } from 'lucide-react';
 import { BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
+
+
+function base64UrlToArrayBuffer(value: string): ArrayBuffer {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes.buffer;
+}
+
+function arrayBufferToBase64Url(value: ArrayBuffer): string {
+  const bytes = new Uint8Array(value);
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function isWebAuthnSupported(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.isSecureContext &&
+    'PublicKeyCredential' in window &&
+    !!navigator.credentials
+  );
+}
 
 interface ProfileViewProps {
   user: any;
@@ -23,6 +63,7 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [submittingPassword, setSubmittingPassword] = useState(false);
   const [submittingWeight, setSubmittingWeight] = useState(false);
+  const [registeringPasskey, setRegisteringPasskey] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -144,6 +185,126 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
       setError(err.message || 'Error al actualizar contraseña.');
     } finally {
       setSubmittingPassword(false);
+    }
+  };
+
+  const handleRegisterPasskey = async () => {
+    setError('');
+    setSuccess('');
+
+    if (!isWebAuthnSupported()) {
+      setError(
+        'Este dispositivo o navegador no permite el acceso mediante Passkeys.'
+      );
+      return;
+    }
+
+    setRegisteringPasskey(true);
+
+    try {
+      const optionsResponse = await apiFetch(
+        '/api/auth/webauthn/register/options',
+        {
+          method: 'POST',
+        }
+      );
+
+      const optionsData = await optionsResponse.json();
+
+      if (!optionsResponse.ok) {
+        throw new Error(
+          optionsData.detail ||
+          optionsData.error ||
+          'No se han podido preparar las opciones de registro.'
+        );
+      }
+
+      const publicKey: PublicKeyCredentialCreationOptions = {
+        ...optionsData,
+        challenge: base64UrlToArrayBuffer(optionsData.challenge),
+        user: {
+          ...optionsData.user,
+          id: base64UrlToArrayBuffer(optionsData.user.id),
+        },
+        excludeCredentials: (optionsData.excludeCredentials || []).map(
+          (credential: {
+            id: string;
+            type: string;
+            transports?: string[];
+          }) => ({
+            ...credential,
+            id: base64UrlToArrayBuffer(credential.id),
+          })
+        ),
+      };
+
+      const credential = await navigator.credentials.create({ publicKey });
+
+      if (!credential || credential.type !== 'public-key') {
+        throw new Error('No se ha podido crear la Passkey.');
+      }
+
+      const publicKeyCredential = credential as PublicKeyCredential;
+      const attestation =
+        publicKeyCredential.response as AuthenticatorAttestationResponse;
+
+      const credentialPayload = {
+        id: publicKeyCredential.id,
+        rawId: arrayBufferToBase64Url(publicKeyCredential.rawId),
+        type: publicKeyCredential.type,
+        response: {
+          clientDataJSON: arrayBufferToBase64Url(
+            attestation.clientDataJSON
+          ),
+          attestationObject: arrayBufferToBase64Url(
+            attestation.attestationObject
+          ),
+        },
+      };
+
+      const verifyResponse = await apiFetch(
+        '/api/auth/webauthn/register/verify',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            credential: credentialPayload,
+          }),
+        }
+      );
+
+      const verifyData = await verifyResponse.json();
+
+      if (!verifyResponse.ok) {
+        throw new Error(
+          verifyData.detail ||
+          verifyData.error ||
+          'No se ha podido registrar la Passkey.'
+        );
+      }
+
+      setSuccess(
+        'Dispositivo registrado correctamente. Ya puedes usar tu huella, Face ID o PIN para entrar.'
+      );
+    } catch (err: any) {
+      if (err?.name === 'NotAllowedError') {
+        setError(
+          'El registro fue cancelado o el dispositivo no completó la autenticación.'
+        );
+      } else if (err?.name === 'InvalidStateError') {
+        setError(
+          'Este dispositivo ya tiene una Passkey registrada para esta cuenta.'
+        );
+      } else {
+        setError(
+          err?.message ||
+          'No se ha podido registrar el acceso biométrico.'
+        );
+      }
+    } finally {
+      setRegisteringPasskey(false);
     }
   };
 
@@ -283,6 +444,50 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
           ) : (
             <p className="text-[11px] text-neutral-600 text-center py-2">No has registrado tu peso corporal todavía.</p>
           )}
+        </div>
+      </div>
+
+      {/* Passkey / acceso biométrico */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex items-center gap-3">
+          <div className="p-2 bg-slate-100 rounded-xl">
+            <Fingerprint className="w-5 h-5 text-slate-700" />
+          </div>
+
+          <div>
+            <h3 className="font-bold text-slate-900">
+              Acceso biométrico
+            </h3>
+            <p className="text-sm text-slate-500">
+              Usa la huella, Face ID o el método de desbloqueo de tu dispositivo.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-5">
+          <p className="text-sm text-slate-600 mb-4">
+            Registra este dispositivo para poder entrar posteriormente sin escribir la contraseña.
+          </p>
+
+          <button
+            id="profile-passkey-register"
+            type="button"
+            onClick={handleRegisterPasskey}
+            disabled={registeringPasskey}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            {registeringPasskey ? (
+              <>
+                <Loader className="w-5 h-5 animate-spin" />
+                Registrando dispositivo...
+              </>
+            ) : (
+              <>
+                <Fingerprint className="w-5 h-5" />
+                Registrar este dispositivo
+              </>
+            )}
+          </button>
         </div>
       </div>
 

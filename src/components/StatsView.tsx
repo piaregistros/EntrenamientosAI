@@ -39,13 +39,22 @@ export default function StatsView({ user }: StatsViewProps) {
       const sumRes = await apiFetch(`/api/stats/summary?user_id=${encodeURIComponent(user.id)}`);
       if (!sumRes.ok) throw new Error('Error al cargar resumen estadístico');
       const sumData = await sumRes.json();
-      setStatsSummary(sumData);
+      setStatsSummary(sumData.summary ?? sumData);
 
       // 2. Fetch personal records
       const prRes = await apiFetch(`/api/stats/prs?user_id=${encodeURIComponent(user.id)}`);
       if (!prRes.ok) throw new Error('Error al cargar records personales (PRs)');
       const prData = await prRes.json();
-      setPrs(prData);
+      setPrs((prData.prs ?? []).map((pr: any) => ({
+        exercise_id: pr.exercise_id,
+        exercise_name: pr.exercise_name,
+        target_muscle: pr.target_muscle,
+        category: pr.category,
+        weight_kg: pr.best_weight?.weight_kg ?? 0,
+        reps: pr.best_weight?.reps ?? 0,
+        estimated_1rm: pr.best_estimated_1rm?.estimated_1rm_kg ?? 0,
+        date: pr.best_weight?.date ?? pr.best_estimated_1rm?.date ?? null,
+      })));
 
       // 3. Fetch exercises for selection dropdown
       const exRes = await apiFetch('/api/exercises');
@@ -244,7 +253,7 @@ export default function StatsView({ user }: StatsViewProps) {
 
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block">Registro de Progresiones</span>
-                  <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-36 overflow-y-auto pr-1 scrollbar-hide">
                     {exHistory.map((h, idx) => (
                       <div key={idx} className="bg-neutral-950/45 border border-neutral-850/30 p-2.5 rounded-xl flex justify-between items-center">
                         <span className="text-[10px] font-mono text-neutral-400">
@@ -277,7 +286,7 @@ export default function StatsView({ user }: StatsViewProps) {
             </div>
 
             {prs.length > 0 ? (
-              <div className="grid grid-cols-1 gap-2.5 max-h-60 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 gap-2.5 max-h-60 overflow-y-auto pr-1 scrollbar-hide">
                 {prs.map((pr) => (
                   <div key={pr.exercise_id} className="bg-neutral-950/60 p-3 rounded-xl border border-neutral-800/60 flex justify-between items-center group hover:border-neutral-700 transition-all">
                     <div>

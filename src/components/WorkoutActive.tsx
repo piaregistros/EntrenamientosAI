@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Dumbbell, Timer, ArrowRight, ArrowLeft, Plus, Check, Trash2, RefreshCw, XCircle, ChevronRight, CheckCircle2, AlertTriangle, Loader, Volume2, Info } from 'lucide-react';
+import { Play, Dumbbell, Timer, ArrowRight, ArrowLeft, Plus, Check, Trash2, Pencil, Save, X, RefreshCw, XCircle, ChevronRight, CheckCircle2, AlertTriangle, Loader, Volume2, Info, MessageCircle, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Exercise, Routine, RoutineExercise, WorkoutLog, WorkoutSet, ExerciseSubstitution } from '../types';
 import { apiFetch } from '../lib/api';
@@ -36,8 +36,12 @@ export default function WorkoutActive({
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   
   // Timer states
+  // Los relojes se basan en timestamps reales para funcionar
+  // correctamente aunque el navegador quede en segundo plano.
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
   const [totalRestDuration, setTotalRestDuration] = useState<number>(0);
 
   // Form states for adding sets
@@ -46,10 +50,20 @@ export default function WorkoutActive({
   const [inputRir, setInputRir] = useState<string>('2');
   const [isWarmup, setIsWarmup] = useState<boolean>(false);
   const [setNote, setSetNote] = useState<string>('');
+  // Edición de series registradas
+  const [editingSetId, setEditingSetId] = useState<string | null>(null);
+  const [editingWeight, setEditingWeight] = useState<string>('');
+  const [editingReps, setEditingReps] = useState<string>('');
+  const [editingRir, setEditingRir] = useState<string>('2');
+  const [editingWarmup, setEditingWarmup] = useState<boolean>(false);
+  const [editingNote, setEditingNote] = useState<string>('');
+  const [savingEditedSet, setSavingEditedSet] = useState(false);
+
 
   // Modals & panels
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [finishNotes, setFinishNotes] = useState('');
+  const [workoutCompleted, setWorkoutCompleted] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [availableSubs, setAvailableSubs] = useState<any[]>([]);
   const [subReason, setSubReason] = useState('No disponible');
@@ -91,27 +105,86 @@ export default function WorkoutActive({
     startWorkoutSession();
   }, [routineId, existingWorkoutId]);
 
-  // Main session stopwatch
+  // Reloj de sesión basado en tiempo real.
+  // setInterval solo sirve para refrescar la pantalla; el tiempo
+  // transcurrido siempre se calcula mediante Date.now().
   useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsedSeconds(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (sessionStartedAt === null) return;
 
-  // Rest timer countdown
+    const updateElapsed = () => {
+      setElapsedSeconds(
+        Math.max(0, Math.floor((Date.now() - sessionStartedAt) / 1000))
+      );
+    };
+
+    updateElapsed();
+
+    const interval = window.setInterval(updateElapsed, 1000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateElapsed();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange
+      );
+    };
+  }, [sessionStartedAt]);
+
+  // Descanso basado en un instante real de finalización.
+  // El navegador puede pausar los timers en segundo plano sin alterar
+  // el tiempo real transcurrido.
   useEffect(() => {
-    if (restSecondsLeft === null) return;
-    if (restSecondsLeft <= 0) {
-      playTimerDoneSound();
+    if (restEndsAt === null) {
       setRestSecondsLeft(null);
       return;
     }
-    const timer = setTimeout(() => {
-      setRestSecondsLeft(restSecondsLeft - 1);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [restSecondsLeft]);
+
+    let finished = false;
+
+    const updateRest = () => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((restEndsAt - Date.now()) / 1000)
+      );
+
+      setRestSecondsLeft(remaining);
+
+      if (remaining <= 0 && !finished) {
+        finished = true;
+        playTimerDoneSound();
+        setRestSecondsLeft(null);
+        setRestEndsAt(null);
+      }
+    };
+
+    updateRest();
+
+    const interval = window.setInterval(updateRest, 250);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateRest();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange
+      );
+    };
+  }, [restEndsAt]);
 
   const startWorkoutSession = async () => {
     setLoading(true);
@@ -170,10 +243,12 @@ export default function WorkoutActive({
 
       setWorkoutLog(startData);
 
-      // El cronómetro debe continuar desde el inicio real de la sesión.
+      // El cronómetro continúa desde el inicio real de la sesión.
       if (startData.date) {
         const startedAt = new Date(startData.date).getTime();
+
         if (!Number.isNaN(startedAt)) {
+          setSessionStartedAt(startedAt);
           setElapsedSeconds(
             Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
           );
@@ -373,10 +448,18 @@ export default function WorkoutActive({
 
     try {
       // El backend exige set_number.
-      // Calculamos el siguiente número únicamente para
-      // el ejercicio activo.
+      // No usamos simplemente la cantidad de series porque, si el
+      // usuario borra una serie intermedia, pueden quedar huecos
+      // (por ejemplo 1, 3). En ese caso debemos continuar desde
+      // el número más alto existente.
+      const exerciseSets = loggedSets.filter(
+        s => s.exercise_id === activeExercise.id
+      );
+
       const nextSetNumber =
-        loggedSets.filter(s => s.exercise_id === activeExercise.id).length + 1;
+        exerciseSets.length > 0
+          ? Math.max(...exerciseSets.map(s => Number(s.set_number) || 0)) + 1
+          : 1;
 
       const res = await apiFetch(`/api/workouts/${workoutLog.id}/sets?user_id=${encodeURIComponent(user.id)}`, {
         method: 'POST',
@@ -398,13 +481,20 @@ export default function WorkoutActive({
       if (!res.ok) throw new Error(data.error || 'No se pudo guardar la serie');
 
       // Update logged sets locally
-      setLoggedSets([...loggedSets, data]);
+      setLoggedSets(prev => [...prev, data]);
       setSetNote(''); // clear note
 
-      // Trigger Rest Timer automatically
+      // Trigger Rest Timer automatically.
+      // Guardamos el instante exacto en que debe terminar.
       if (activeExerciseItem.rest_seconds > 0) {
-        setTotalRestDuration(activeExerciseItem.rest_seconds);
-        setRestSecondsLeft(activeExerciseItem.rest_seconds);
+        const restDuration = activeExerciseItem.rest_seconds;
+        const endsAt = Date.now() + restDuration * 1000;
+
+        setTotalRestDuration(restDuration);
+        setRestEndsAt(endsAt);
+        setRestSecondsLeft(
+          Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
+        );
       }
     } catch (err: any) {
       setError(err.message || 'Error al guardar la serie.');
@@ -412,6 +502,105 @@ export default function WorkoutActive({
       setSubmittingSet(false);
     }
   };
+  const handleStartEditSet = (set: WorkoutSet) => {
+    setError(null);
+    setEditingSetId(set.id);
+    setEditingWeight(String(set.weight_kg ?? 0));
+    setEditingReps(String(set.reps ?? 1));
+    setEditingRir(set.rir == null ? 'N/A' : String(set.rir));
+    setEditingWarmup(Boolean(set.is_warmup));
+    setEditingNote(set.notes ?? '');
+  };
+
+  const handleCancelEditSet = () => {
+    setEditingSetId(null);
+    setEditingWeight('');
+    setEditingReps('');
+    setEditingRir('2');
+    setEditingWarmup(false);
+    setEditingNote('');
+  };
+
+  const handleSaveEditedSet = async (set: WorkoutSet) => {
+    if (!workoutLog) return;
+
+    const weight = parseFloat(editingWeight);
+    const reps = parseInt(editingReps, 10);
+
+    if (!Number.isFinite(weight) || weight < 0) {
+      setError('Introduce un peso válido.');
+      return;
+    }
+
+    if (!Number.isFinite(reps) || reps < 1) {
+      setError('Introduce un número de repeticiones válido.');
+      return;
+    }
+
+    const rir =
+      editingWarmup || editingRir === 'N/A'
+        ? null
+        : parseInt(editingRir, 10);
+
+    if (
+      rir !== null &&
+      (!Number.isFinite(rir) || rir < 0 || rir > 10)
+    ) {
+      setError('Introduce un RIR válido.');
+      return;
+    }
+
+    setSavingEditedSet(true);
+    setError(null);
+
+    try {
+      const res = await apiFetch(
+        `/api/workouts/${encodeURIComponent(workoutLog.id)}/sets/${encodeURIComponent(set.id)}?user_id=${encodeURIComponent(user.id)}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            set_number: set.set_number,
+            weight_kg: weight,
+            reps,
+            rir,
+            is_warmup: editingWarmup,
+            notes: editingNote.trim() || null,
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          data.detail ||
+          data.error ||
+          'No se pudo actualizar la serie'
+        );
+      }
+
+      setLoggedSets(prev =>
+        prev.map(currentSet =>
+          currentSet.id === set.id ? data : currentSet
+        )
+      );
+
+      handleCancelEditSet();
+
+    } catch (err: any) {
+      setError(
+        err.message ||
+        'Error al actualizar la serie.'
+      );
+    } finally {
+      setSavingEditedSet(false);
+    }
+  };
+
+
 
   const handleDeleteSet = async (setId: string) => {
     if (!workoutLog) return;
@@ -426,12 +615,127 @@ export default function WorkoutActive({
         throw new Error(data.error || 'No se pudo borrar la serie');
       }
 
-      // Filter out locally and adjust set numbers (server automatically does it but we match)
-      const remaining = loggedSets.filter(s => s.id !== setId);
-      setLoggedSets(remaining);
+      // El servidor es la fuente de verdad. Eliminamos localmente
+      // la serie y conservamos los números que devuelve el estado
+      // actual. No renumeramos a mano en el frontend.
+      setLoggedSets(prev => prev.filter(s => s.id !== setId));
     } catch (err: any) {
       setError(err.message || 'Error al borrar la serie.');
     }
+  };
+
+  const getWorkoutShareText = () => {
+    const completedSets = loggedSets.filter(set => !set.is_warmup);
+
+    const exerciseMap = new Map<string, WorkoutSet[]>();
+
+    completedSets.forEach(set => {
+      const key = set.exercise_id;
+      const current = exerciseMap.get(key) ?? [];
+      current.push(set);
+      exerciseMap.set(key, current);
+    });
+
+    const exerciseLines: string[] = [];
+
+    exerciseMap.forEach((sets) => {
+      const exerciseName = sets[0]?.exercise_name?.trim() || 'Ejercicio';
+      const plancha = exerciseName.toLowerCase() === 'plancha';
+
+      const seriesText = [...sets]
+        .sort((a, b) => a.set_number - b.set_number)
+        .map(set => {
+          if (plancha) {
+            return `${set.weight_kg} kg × ${set.reps} s`;
+          }
+
+          return `${set.weight_kg} kg × ${set.reps}`;
+        })
+        .join(' · ');
+
+      exerciseLines.push(`• ${exerciseName}: ${seriesText}`);
+    });
+
+    const duration = Math.max(1, Math.round(elapsedSeconds / 60));
+
+    const totalVolume = completedSets.reduce(
+      (total, set) =>
+        total +
+        (Number(set.weight_kg) || 0) * (Number(set.reps) || 0),
+      0
+    );
+
+    const lines = [
+      '🏋️ ENTRENAMIENTO COMPLETADO',
+      '',
+      `⏱️ Duración: ${duration} min`,
+      `💪 Ejercicios: ${exerciseMap.size}`,
+      `🔢 Series: ${completedSets.length}`,
+    ];
+
+    if (totalVolume > 0) {
+      lines.push(
+        `📦 Volumen: ${Math.round(totalVolume).toLocaleString('es-ES')} kg`
+      );
+    }
+
+    if (exerciseLines.length > 0) {
+      lines.push('', ...exerciseLines);
+    }
+
+    if (finishNotes.trim()) {
+      lines.push('', `📝 ${finishNotes.trim()}`);
+    }
+
+    lines.push('', '🔥 ¡Entrenamiento completado!');
+
+    return lines.join('\n');
+  };
+
+  const handleShareWhatsApp = async () => {
+    const text = getWorkoutShareText();
+    const encodedText = encodeURIComponent(text);
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile && typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: "Entrenamiento completado",
+          text,
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      }
+      return;
+    }
+
+    if (isMobile) {
+      window.location.href = "whatsapp://send?text=" + encodedText;
+      return;
+    }
+
+    window.location.href = "whatsapp://send?text=" + encodedText;
+  };
+  const handleNativeShare = async () => {
+    const text = getWorkoutShareText();
+
+    if (!navigator.share) return;
+
+    try {
+      await navigator.share({
+        title: 'Entrenamiento completado',
+        text,
+      });
+    } catch {
+      // Cancelar el menú de compartir no es un error.
+    }
+  };
+
+  const handleExitCompletedWorkout = () => {
+    setWorkoutCompleted(false);
+    onWorkoutFinished();
   };
 
   const handleFinishWorkout = async () => {
@@ -458,7 +762,8 @@ export default function WorkoutActive({
         throw new Error(data.error || 'No se pudo finalizar el entrenamiento');
       }
 
-      onWorkoutFinished();
+      setShowFinishModal(false);
+      setWorkoutCompleted(true);
     } catch (err: any) {
       setError(err.message || 'Error al guardar entrenamiento.');
       setShowFinishModal(false);
@@ -938,44 +1243,234 @@ export default function WorkoutActive({
                 <div
                   key={set.id}
                   id={`logged-set-item-${idx}`}
-                  className="bg-neutral-900 border border-neutral-800/80 rounded-xl p-3.5 flex justify-between items-center"
+                  className="bg-neutral-900 border border-neutral-800/80 rounded-xl p-3.5"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className={`w-6 h-6 rounded-lg text-[10px] font-bold flex items-center justify-center ${
-                      set.is_warmup 
-                        ? 'bg-yellow-400/10 border border-yellow-400/20 text-yellow-400'
-                        : 'bg-lime-400/10 border border-lime-400/20 text-lime-400'
-                    }`}>
-                      {set.is_warmup ? 'C' : `${set.set_number}`}
-                    </span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-white">
-                          {set.exercise_name?.trim().toLowerCase() === 'plancha' ? 'Plancha' : `${set.weight_kg} kg`}
-                        </span>
-                        <span className="text-neutral-500 text-xs">×</span>
-                        <span className="text-xs font-black text-white">
-                          {set.reps} {set.exercise_name?.trim().toLowerCase() === 'plancha' ? 'segundos' : 'reps'}
-                        </span>
-                        {set.rir !== null && (
-                          <span className="text-[9px] bg-neutral-950 border border-neutral-800 px-2 py-0.5 rounded-md text-neutral-400 font-bold">
-                            RIR {set.rir}
-                          </span>
-                        )}
-                      </div>
-                      {set.notes && (
-                        <p className="text-[10px] text-neutral-400 mt-1 italic">"{set.notes}"</p>
-                      )}
-                    </div>
-                  </div>
+                  {editingSetId === set.id ? (
+                    <div className="space-y-3">
 
-                  <button
-                    id={`btn-delete-set-${idx}`}
-                    onClick={() => handleDeleteSet(set.id)}
-                    className="text-neutral-500 hover:text-red-400 p-2 rounded-xl hover:bg-red-500/10 transition-all"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-6 h-6 rounded-lg text-[10px] font-bold flex items-center justify-center ${
+                          set.is_warmup
+                            ? 'bg-yellow-400/10 border border-yellow-400/20 text-yellow-400'
+                            : 'bg-lime-400/10 border border-lime-400/20 text-lime-400'
+                        }`}>
+                          {set.is_warmup ? 'C' : `${set.set_number}`}
+                        </span>
+
+                        <span className="text-xs font-bold text-white">
+                          Editar serie
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider">
+                            Peso (kg)
+                          </label>
+
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={editingWeight}
+                            onChange={e => setEditingWeight(e.target.value)}
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl py-2.5 px-3 text-white text-sm font-mono font-bold text-center focus:outline-none focus:border-lime-500"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider">
+                            {set.exercise_name?.trim().toLowerCase() === 'plancha'
+                              ? 'Tiempo (s)'
+                              : 'Reps'}
+                          </label>
+
+                          <input
+                            type="number"
+                            min="1"
+                            value={editingReps}
+                            onChange={e => setEditingReps(e.target.value)}
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl py-2.5 px-3 text-white text-sm font-mono font-bold text-center focus:outline-none focus:border-lime-500"
+                          />
+                        </div>
+
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider">
+                            RIR
+                          </label>
+
+                          <select
+                            value={editingWarmup ? 'N/A' : editingRir}
+                            onChange={e => setEditingRir(e.target.value)}
+                            disabled={editingWarmup}
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl py-2.5 px-3 text-white text-xs font-bold focus:outline-none focus:border-lime-500 disabled:opacity-50"
+                          >
+                            <option value="0">RIR 0 (Fallo)</option>
+                            <option value="1">RIR 1</option>
+                            <option value="2">RIR 2</option>
+                            <option value="3">RIR 3</option>
+                            <option value="4">RIR 4</option>
+                            <option value="N/A">N/A</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider">
+                            Tipo
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingWarmup(current => {
+                                const next = !current;
+
+                                if (next) {
+                                  setEditingRir('N/A');
+                                } else {
+                                  setEditingRir('2');
+                                }
+
+                                return next;
+                              });
+                            }}
+                            className={`w-full font-bold py-2.5 px-3 rounded-xl text-xs border transition-all ${
+                              editingWarmup
+                                ? 'bg-yellow-400/10 border-yellow-400/30 text-yellow-400'
+                                : 'bg-neutral-950 border-neutral-800 text-neutral-400'
+                            }`}
+                          >
+                            {editingWarmup ? 'Calentamiento' : 'Trabajo'}
+                          </button>
+                        </div>
+
+                      </div>
+
+                      <input
+                        type="text"
+                        value={editingNote}
+                        onChange={e => setEditingNote(e.target.value)}
+                        placeholder="Notas de esta serie..."
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl py-2.5 px-3 text-white text-xs placeholder-neutral-600 focus:outline-none focus:border-lime-500"
+                      />
+
+                      <div className="flex gap-2">
+
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEditedSet(set)}
+                          disabled={savingEditedSet}
+                          className="flex-1 bg-lime-400 hover:bg-lime-300 text-black font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {savingEditedSet ? (
+                            <Loader className="animate-spin" size={14} />
+                          ) : (
+                            <Save size={14} />
+                          )}
+
+                          Guardar
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleCancelEditSet}
+                          disabled={savingEditedSet}
+                          className="flex-1 bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          <X size={14} />
+                          Cancelar
+                        </button>
+
+                      </div>
+
+                    </div>
+                  ) : (
+
+                    <div className="flex justify-between items-center">
+
+                      <div className="flex items-center gap-3 min-w-0">
+
+                        <span className={`w-6 h-6 rounded-lg text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                          set.is_warmup
+                            ? 'bg-yellow-400/10 border border-yellow-400/20 text-yellow-400'
+                            : 'bg-lime-400/10 border border-lime-400/20 text-lime-400'
+                        }`}>
+                          {set.is_warmup ? 'C' : `${set.set_number}`}
+                        </span>
+
+                        <div className="min-w-0">
+
+                          <div className="flex items-center gap-2 flex-wrap">
+
+                            <span className="text-xs font-black text-white">
+                              {set.exercise_name?.trim().toLowerCase() === 'plancha'
+                                ? 'Plancha'
+                                : `${set.weight_kg} kg`}
+                            </span>
+
+                            <span className="text-neutral-500 text-xs">
+                              ×
+                            </span>
+
+                            <span className="text-xs font-black text-white">
+                              {set.reps}{' '}
+                              {set.exercise_name?.trim().toLowerCase() === 'plancha'
+                                ? 'segundos'
+                                : 'reps'}
+                            </span>
+
+                            {set.rir !== null && (
+                              <span className="text-[9px] bg-neutral-950 border border-neutral-800 px-2 py-0.5 rounded-md text-neutral-400 font-bold">
+                                RIR {set.rir}
+                              </span>
+                            )}
+
+                          </div>
+
+                          {set.notes && (
+                            <p className="text-[10px] text-neutral-400 mt-1 italic">
+                              "{set.notes}"
+                            </p>
+                          )}
+
+                        </div>
+
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+
+                        <button
+                          id={`btn-edit-set-${idx}`}
+                          type="button"
+                          onClick={() => handleStartEditSet(set)}
+                          className="text-neutral-500 hover:text-lime-400 p-2 rounded-xl hover:bg-lime-500/10 transition-all"
+                          title="Editar serie"
+                          aria-label={`Editar serie ${set.set_number}`}
+                        >
+                          <Pencil size={14} />
+                        </button>
+
+                        <button
+                          id={`btn-delete-set-${idx}`}
+                          type="button"
+                          onClick={() => handleDeleteSet(set.id)}
+                          className="text-neutral-500 hover:text-red-400 p-2 rounded-xl hover:bg-red-500/10 transition-all"
+                          title="Borrar serie"
+                          aria-label={`Borrar serie ${set.set_number}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  )}
                 </div>
               ))}
             </div>
@@ -1069,7 +1564,9 @@ export default function WorkoutActive({
             <div className="flex items-center gap-2">
               <button
                 id="btn-timer-add-30"
-                onClick={() => setRestSecondsLeft(prev => (prev || 0) + 30)}
+                onClick={() => {
+                  setRestEndsAt(prev => (prev ?? Date.now()) + 30000);
+                }}
                 className="bg-black/10 hover:bg-black/15 font-bold px-2.5 py-1.5 rounded-lg text-[10px]"
                 style={{ minHeight: '30px' }}
               >
@@ -1077,7 +1574,10 @@ export default function WorkoutActive({
               </button>
               <button
                 id="btn-timer-skip"
-                onClick={() => setRestSecondsLeft(null)}
+                onClick={() => {
+                  setRestEndsAt(null);
+                  setRestSecondsLeft(null);
+                }}
                 className="bg-black text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px]"
                 style={{ minHeight: '30px' }}
               >
@@ -1167,6 +1667,153 @@ export default function WorkoutActive({
                 <p className="text-xs text-neutral-500 text-center py-4">No se encontraron alternativas directas configuradas para este ejercicio.</p>
               )}
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Workout Completed / Share */}
+      {workoutCompleted && (
+        <div
+          id="workout-completed-screen"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-neutral-900 border border-neutral-800 rounded-3xl w-full max-w-md p-6 space-y-6 shadow-2xl select-none max-h-[90vh] overflow-y-auto"
+          >
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-lime-500/10 border border-lime-500/20 text-lime-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 size={32} />
+              </div>
+
+              <h3 className="text-xl font-black text-white">
+                ¡Entrenamiento completado!
+              </h3>
+
+              <p className="text-xs text-neutral-400">
+                Has terminado tu sesión. Puedes compartirla directamente.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-center">
+                <div className="text-lg font-black text-white">
+                  {Math.max(1, Math.round(elapsedSeconds / 60))}
+                </div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-neutral-500">
+                  minutos
+                </div>
+              </div>
+
+              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-center">
+                <div className="text-lg font-black text-white">
+                  {new Set(
+                    loggedSets
+                      .filter(set => !set.is_warmup)
+                      .map(set => set.exercise_id)
+                  ).size}
+                </div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-neutral-500">
+                  ejercicios
+                </div>
+              </div>
+
+              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-center">
+                <div className="text-lg font-black text-white">
+                  {loggedSets.filter(set => !set.is_warmup).length}
+                </div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-neutral-500">
+                  series
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 space-y-3">
+              <div className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                Resumen
+              </div>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {Array.from(
+                  new Map<string, WorkoutSet>(
+                    loggedSets
+                      .filter(set => !set.is_warmup)
+                      .map(set => [set.exercise_id, set] as [string, WorkoutSet])
+                  ).values()
+                ).map((firstSet: WorkoutSet) => {
+                  const exerciseSets = loggedSets
+                    .filter(
+                      set =>
+                        set.exercise_id === firstSet.exercise_id &&
+                        !set.is_warmup
+                    )
+                    .sort((a, b) => a.set_number - b.set_number);
+
+                  return (
+                    <div
+                      key={firstSet.exercise_id}
+                      className="text-xs"
+                    >
+                      <div className="font-bold text-white">
+                        {firstSet.exercise_name?.trim() || 'Ejercicio'}
+                      </div>
+
+                      <div className="text-neutral-500">
+                        {exerciseSets
+                          .map(set => `${set.weight_kg} kg × ${set.reps}`)
+                          .join(' · ')}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {finishNotes.trim() && (
+                <div className="border-t border-neutral-800 pt-3 text-xs text-neutral-400">
+                  <span className="font-bold text-neutral-500">
+                    Nota:
+                  </span>{' '}
+                  {finishNotes.trim()}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <button
+                id="btn-share-whatsapp"
+                type="button"
+                onClick={handleShareWhatsApp}
+                className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-extrabold py-3.5 px-4 rounded-xl text-xs transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
+                style={{ minHeight: '48px' }}
+              >
+                <MessageCircle size={18} />
+                Compartir por WhatsApp
+              </button>
+
+              {typeof navigator !== 'undefined' && !!navigator.share && (
+                <button
+                  id="btn-share-native"
+                  type="button"
+                  onClick={handleNativeShare}
+                  className="w-full bg-neutral-800 border border-neutral-700 text-white font-bold py-3.5 px-4 rounded-xl text-xs transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                  style={{ minHeight: '48px' }}
+                >
+                  <Share2 size={17} />
+                  Compartir con otras apps
+                </button>
+              )}
+            </div>
+
+            <button
+              id="btn-completed-continue"
+              type="button"
+              onClick={handleExitCompletedWorkout}
+              className="w-full bg-neutral-950 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 font-bold py-3 px-4 rounded-xl text-xs transition-all active:scale-[0.98]"
+              style={{ minHeight: '44px' }}
+            >
+              Continuar
+            </button>
           </motion.div>
         </div>
       )}

@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+
+/* Oculta la barra de desplazamiento manteniendo el scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

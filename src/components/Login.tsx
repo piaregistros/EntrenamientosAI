@@ -1,7 +1,47 @@
 import React, { useState } from 'react';
-import { Dumbbell, Lock, Mail, AlertCircle, Loader } from 'lucide-react';
+import { Dumbbell, Lock, Mail, AlertCircle, Loader, Fingerprint } from 'lucide-react';
 import { motion } from 'motion/react';
 import { apiFetch } from '../lib/api';
+
+
+function base64UrlToArrayBuffer(value: string): ArrayBuffer {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes.buffer;
+}
+
+function arrayBufferToBase64Url(value: ArrayBuffer): string {
+  const bytes = new Uint8Array(value);
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function isWebAuthnSupported(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.isSecureContext &&
+    'PublicKeyCredential' in window &&
+    !!navigator.credentials
+  );
+}
 
 interface LoginProps {
   onLoginSuccess: (user: any) => void;
@@ -12,6 +52,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [passkeyUser, setPasskeyUser] = useState<'pablo' | 'estefi' | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +89,134 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       setError(err.message || 'Error al conectar con el servidor.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasskeyLogin = async (userType: 'pablo' | 'estefi') => {
+    setError(null);
+    setLoading(true);
+    setPasskeyUser(userType);
+
+    const userNames = {
+      pablo: 'Pablo',
+      estefi: 'Estefi',
+    };
+
+    try {
+      if (!isWebAuthnSupported()) {
+        throw new Error(
+          'Este dispositivo o navegador no permite el acceso mediante Passkeys. Usa la contraseña.'
+        );
+      }
+
+      // El backend localiza directamente al usuario por su nombre
+      // e inicia la ceremonia WebAuthn para sus Passkeys registradas.
+      const optionsResponse = await apiFetch(
+        '/api/auth/webauthn/login/options',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: userNames[userType],
+          }),
+        }
+      );
+
+      const optionsData = await optionsResponse.json();
+
+      if (!optionsResponse.ok) {
+        throw new Error(
+          optionsData.detail ||
+          optionsData.error ||
+          'Esta cuenta no tiene una Passkey registrada.'
+        );
+      }
+
+      const publicKey: PublicKeyCredentialRequestOptions = {
+        ...optionsData,
+        challenge: base64UrlToArrayBuffer(optionsData.challenge),
+        allowCredentials: (optionsData.allowCredentials || []).map(
+          (credential: {
+            id: string;
+            type: string;
+            transports?: string[];
+          }) => ({
+            ...credential,
+            id: base64UrlToArrayBuffer(credential.id),
+          })
+        ),
+      };
+
+      const credential = await navigator.credentials.get({ publicKey });
+
+      if (!credential || credential.type !== 'public-key') {
+        throw new Error('No se ha podido obtener la Passkey.');
+      }
+
+      const publicKeyCredential = credential as PublicKeyCredential;
+      const assertion =
+        publicKeyCredential.response as AuthenticatorAssertionResponse;
+
+      const credentialPayload = {
+        id: publicKeyCredential.id,
+        rawId: arrayBufferToBase64Url(publicKeyCredential.rawId),
+        type: publicKeyCredential.type,
+        response: {
+          clientDataJSON: arrayBufferToBase64Url(
+            assertion.clientDataJSON
+          ),
+          authenticatorData: arrayBufferToBase64Url(
+            assertion.authenticatorData
+          ),
+          signature: arrayBufferToBase64Url(
+            assertion.signature
+          ),
+          userHandle: assertion.userHandle
+            ? arrayBufferToBase64Url(assertion.userHandle)
+            : null,
+        },
+      };
+
+      const verifyResponse = await apiFetch(
+        '/api/auth/webauthn/login/verify',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            credential: credentialPayload,
+          }),
+        }
+      );
+
+      const verifyData = await verifyResponse.json();
+
+      if (!verifyResponse.ok) {
+        throw new Error(
+          verifyData.detail ||
+          verifyData.error ||
+          'No se ha podido verificar la Passkey.'
+        );
+      }
+
+      onLoginSuccess(verifyData);
+    } catch (err: any) {
+      if (err?.name === 'NotAllowedError') {
+        setError(
+          'La autenticación biométrica fue cancelada o no se completó.'
+        );
+      } else {
+        setError(
+          err?.message ||
+          'No se ha podido iniciar sesión mediante Passkey.'
+        );
+      }
+    } finally {
+      setLoading(false);
+      setPasskeyUser(null);
     }
   };
 
@@ -119,29 +288,111 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           transition={{ delay: 0.3, duration: 0.5 }}
           className="bg-neutral-900/80 backdrop-blur-md rounded-2xl border border-neutral-800 p-6 shadow-2xl space-y-6"
         >
-          {/* Demo Info Banner */}
-          <div className="bg-lime-950/20 border border-lime-800/40 rounded-xl p-3.5 text-xs text-neutral-300 leading-relaxed space-y-1">
-            <div className="font-extrabold text-lime-400 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
-              <span>💡 Modo Demostración</span>
-            </div>
-            <p>La aplicación utiliza una base de datos local preinstalada con rutinas, estadísticas e historial.</p>
-            <p className="text-neutral-400 mt-1">Usa los botones de acceso rápido o pulsa <strong>Entrar como Invitado</strong> abajo para navegar.</p>
-          </div>
-
+          {/* Mensaje de error */}
           {error && (
-            <div id="login-error" className="flex items-start gap-3 bg-red-950/40 border border-red-900/50 text-red-300 p-4 rounded-xl text-xs animate-shake">
-              <AlertCircle className="shrink-0 mt-0.5" size={16} />
+            <div
+              id="login-error"
+              className="flex items-start gap-3 bg-red-950/40 border border-red-900/50 text-red-300 p-4 rounded-xl text-sm"
+            >
+              <AlertCircle className="shrink-0 mt-0.5" size={18} />
               <span>{error}</span>
             </div>
           )}
 
+          {/* Acceso biométrico */}
+          <div>
+            <div className="mb-4">
+              <h2 className="text-white font-bold text-lg">
+                ¿Quién eres?
+              </h2>
+              <p className="text-neutral-500 text-sm mt-1">
+                Accede rápidamente con la seguridad de tu dispositivo.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                id="quick-login-pablo"
+                type="button"
+                onClick={() => handlePasskeyLogin('pablo')}
+                disabled={loading}
+                className="group relative flex flex-col items-center justify-center min-h-[132px] px-4 py-5 bg-neutral-950/70 border border-neutral-800 hover:border-lime-500/60 hover:bg-neutral-900 rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-lime-500/10 border border-lime-500/20 flex items-center justify-center mb-3 group-hover:bg-lime-500/15 transition-colors">
+                  {loading && passkeyUser === 'pablo' ? (
+                    <Loader className="animate-spin text-lime-400" size={22} />
+                  ) : (
+                    <Fingerprint className="text-lime-400" size={23} />
+                  )}
+                </div>
+
+                <span className="text-white font-bold text-base">
+                  Pablo
+                </span>
+
+                <span className="text-neutral-500 text-xs mt-1">
+                  Administrador
+                </span>
+
+                <span className="text-lime-400/80 text-[10px] font-semibold mt-2">
+                  Huella · Face ID · PIN
+                </span>
+              </button>
+
+              <button
+                id="quick-login-estefi"
+                type="button"
+                onClick={() => handlePasskeyLogin('estefi')}
+                disabled={loading}
+                className="group relative flex flex-col items-center justify-center min-h-[132px] px-4 py-5 bg-neutral-950/70 border border-neutral-800 hover:border-lime-500/60 hover:bg-neutral-900 rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-lime-500/10 border border-lime-500/20 flex items-center justify-center mb-3 group-hover:bg-lime-500/15 transition-colors">
+                  {loading && passkeyUser === 'estefi' ? (
+                    <Loader className="animate-spin text-lime-400" size={22} />
+                  ) : (
+                    <Fingerprint className="text-lime-400" size={23} />
+                  )}
+                </div>
+
+                <span className="text-white font-bold text-base">
+                  Estefi
+                </span>
+
+                <span className="text-neutral-500 text-xs mt-1">
+                  Usuario
+                </span>
+
+                <span className="text-lime-400/80 text-[10px] font-semibold mt-2">
+                  Huella · Face ID · PIN
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Separador */}
+          <div className="flex items-center gap-4 py-1">
+            <div className="flex-1 border-t border-neutral-800" />
+            <span className="text-neutral-600 text-[10px] font-bold uppercase tracking-widest">
+              Acceso con contraseña
+            </span>
+            <div className="flex-1 border-t border-neutral-800" />
+          </div>
+
+          {/* Acceso mediante contraseña */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">Usuario o Email</label>
+              <label
+                htmlFor="login-username"
+                className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2"
+              >
+                Usuario o email
+              </label>
+
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-neutral-500">
                   <Mail size={16} />
                 </span>
+
                 <input
                   id="login-username"
                   type="text"
@@ -155,11 +406,18 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">Contraseña</label>
+              <label
+                htmlFor="login-password"
+                className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2"
+              >
+                Contraseña
+              </label>
+
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-neutral-500">
                   <Lock size={16} />
                 </span>
+
                 <input
                   id="login-password"
                   type="password"
@@ -172,69 +430,23 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-5 gap-3 pt-2">
-              <button
-                id="login-submit-btn"
-                type="submit"
-                disabled={loading}
-                className="col-span-2 bg-neutral-800 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition-all hover:bg-neutral-700 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ minHeight: '44px' }}
-              >
-                {loading ? (
-                  <Loader className="animate-spin" size={16} />
-                ) : (
-                  <span>Entrar</span>
-                )}
-              </button>
-
-              <button
-                id="login-guest-btn"
-                type="button"
-                onClick={() => handleQuickAccess('pablo')}
-                disabled={loading}
-                className="col-span-3 bg-gradient-to-r from-lime-400 to-emerald-500 text-black font-extrabold py-3.5 px-4 rounded-xl text-sm transition-all shadow-lg hover:shadow-lime-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ minHeight: '44px' }}
-              >
-                {loading ? (
-                  <Loader className="animate-spin" size={16} />
-                ) : (
-                  <span>Entrar como Invitado</span>
-                )}
-              </button>
-            </div>
+            <button
+              id="login-submit-btn"
+              type="submit"
+              disabled={loading}
+              className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ minHeight: '46px' }}
+            >
+              {loading ? (
+                <Loader className="animate-spin" size={17} />
+              ) : (
+                <>
+                  <Lock size={16} />
+                  Entrar con contraseña
+                </>
+              )}
+            </button>
           </form>
-
-          {/* Quick Access Area */}
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-neutral-800"></div>
-            <span className="flex-shrink mx-4 text-neutral-500 text-[10px] font-bold uppercase tracking-wider">Perfiles de Prueba</span>
-            <div className="flex-grow border-t border-neutral-800"></div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              id="quick-login-pablo"
-              type="button"
-              onClick={() => handleQuickAccess('pablo')}
-              disabled={loading}
-              className="flex flex-col items-center justify-center py-3 px-4 bg-neutral-950/40 border border-neutral-800 hover:border-lime-500/40 rounded-xl text-neutral-300 font-bold transition-all hover:bg-neutral-900 active:scale-95 group text-xs"
-              style={{ minHeight: '44px' }}
-            >
-              <span className="text-lime-400 group-hover:scale-110 transition-transform">Pablo</span>
-              <span className="text-[10px] text-neutral-500 font-normal mt-1">Administrador</span>
-            </button>
-            <button
-              id="quick-login-estefi"
-              type="button"
-              onClick={() => handleQuickAccess('estefi')}
-              disabled={loading}
-              className="flex flex-col items-center justify-center py-3 px-4 bg-neutral-950/40 border border-neutral-800 hover:border-lime-500/40 rounded-xl text-neutral-300 font-bold transition-all hover:bg-neutral-900 active:scale-95 group text-xs"
-              style={{ minHeight: '44px' }}
-            >
-              <span className="text-lime-400 group-hover:scale-110 transition-transform">Estefi</span>
-              <span className="text-[10px] text-neutral-500 font-normal mt-1">Usuario</span>
-            </button>
-          </div>
         </motion.div>
       </div>
     </div>
