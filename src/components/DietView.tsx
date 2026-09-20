@@ -82,7 +82,7 @@ export default function DietView({ user }: { user: any }) {
         <Utensils size={22} className="text-lime-400" /> Dieta A/B/C
       </h1>
       <p className="text-neutral-400 text-sm mt-1">
-        Hola {user?.name || ''}. Sin cerdo ni marisco. Recetas de 5–25 min.
+        Hola {user?.name || ''}. Sin cerdo ni marisco. Pescado kosher sí. Recetas de 5–25 min.
       </p>
 
       {error && <div className="mt-4 text-sm bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-3">{error}</div>}
@@ -161,10 +161,19 @@ export default function DietView({ user }: { user: any }) {
               <p className="text-xs text-neutral-400 mt-1">{g.summary}</p>
             </button>
           ))}
-          <div className="flex gap-2">
-            {[3, 4, 5].map((n) => (
-              <button key={n} onClick={() => saveProfile({ meals_per_day: n })}
-                className={`flex-1 py-2 rounded-lg ${Number(profile.meals_per_day) === n ? 'bg-lime-400 text-neutral-950' : 'bg-neutral-800'}`}>{n}</button>
+          <div>
+            <p className="text-xs uppercase text-neutral-500 mb-1">Cómo repartir el día</p>
+            <p className="text-xs text-neutral-500 mb-2">Las kcal las fija el objetivo de arriba. Esto solo cambia el número de tomas.</p>
+            {[
+              { n: 3, title: '3 tomas', desc: 'Desayuno, comida y cena. Platos más grandes.' },
+              { n: 4, title: '4 tomas', desc: 'Lo mismo + un snack entre horas.' },
+              { n: 5, title: '5 tomas', desc: 'Snack + algo peri-entreno los días A/B/C.' },
+            ].map((opt) => (
+              <button key={opt.n} onClick={() => saveProfile({ meals_per_day: opt.n })}
+                className={`text-left w-full rounded-xl p-3 border mb-2 ${Number(profile.meals_per_day) === opt.n ? 'border-lime-400 bg-lime-400/10' : 'border-neutral-800 bg-neutral-900'}`}>
+                <p className="font-semibold">{opt.title}</p>
+                <p className="text-xs text-neutral-400 mt-1">{opt.desc}</p>
+              </button>
             ))}
           </div>
           <input type="number" defaultValue={profile.weight_kg || ''} placeholder="Peso kg"
