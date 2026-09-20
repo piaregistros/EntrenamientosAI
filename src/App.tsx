@@ -7,6 +7,7 @@ import HistoryList from './components/HistoryList';
 import StatsView from './components/StatsView';
 import ProfileView from './components/ProfileView';
 import DietView from './components/DietView';
+import ActivitiesView from './components/ActivitiesView';
 import ExerciseInfo from './components/ExerciseInfo';
 import { Exercise } from './types';
 
@@ -157,6 +158,7 @@ export default function App() {
       {activeTab === 'history' && <HistoryList user={user} onOpenExerciseInfo={handleOpenExerciseInfo} />}
       {activeTab === 'stats' && <StatsView user={user} />}
       {activeTab === 'diet' && <DietView user={user} />}
+      {activeTab === 'activity' && <ActivitiesView user={user} />}
       {activeTab === 'profile' && <ProfileView user={user} onLogout={handleLogout} />}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       <ExerciseInfo exercise={selectedExercise} isOpen={isExerciseInfoOpen} onClose={() => setIsExerciseInfoOpen(false)} />
