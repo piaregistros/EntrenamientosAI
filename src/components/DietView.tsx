@@ -10,6 +10,25 @@ const SLOT_LABEL: Record<string, string> = {
   dinner: 'Cena',
 };
 
+function Macros({ protein, carbs, fat }: { protein: number; carbs: number; fat: number }) {
+  return (
+    <div className="grid grid-cols-3 gap-2 mt-3 text-center text-xs">
+      <div className="bg-neutral-800 rounded-lg py-2">
+        <p className="text-neutral-500">Proteína</p>
+        <p className="font-semibold">{protein} g</p>
+      </div>
+      <div className="bg-neutral-800 rounded-lg py-2">
+        <p className="text-neutral-500">Carbos</p>
+        <p className="font-semibold">{carbs} g</p>
+      </div>
+      <div className="bg-neutral-800 rounded-lg py-2">
+        <p className="text-neutral-500">Grasa</p>
+        <p className="font-semibold">{fat} g</p>
+      </div>
+    </div>
+  );
+}
+
 export default function DietView({ user }: { user: any }) {
   const [goals, setGoals] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
@@ -30,7 +49,7 @@ export default function DietView({ user }: { user: any }) {
       apiFetch('/api/diet/week'),
     ]);
     if (!g.ok || !p.ok || !t.ok || !w.ok) {
-      setError('No se pudo cargar la dieta. ¿Backend en feature/diet-engine?');
+      setError('No se pudo cargar la dieta.');
       return;
     }
     setGoals((await g.json()).goals);
@@ -81,9 +100,6 @@ export default function DietView({ user }: { user: any }) {
       <h1 className="text-2xl font-bold mt-1 flex items-center gap-2">
         <Utensils size={22} className="text-lime-400" /> Dieta A/B/C
       </h1>
-      <p className="text-neutral-400 text-sm mt-1">
-        Hola {user?.name || ''}. Sin cerdo ni marisco. Pescado kosher sí. Recetas de 5–25 min.
-      </p>
 
       {error && <div className="mt-4 text-sm bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-3">{error}</div>}
 
@@ -99,15 +115,17 @@ export default function DietView({ user }: { user: any }) {
       {tab === 'hoy' && today && (
         <section>
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 mb-4">
-            <p className="text-lime-400 text-xs uppercase">{today.weekday}</p>
-            <h2 className="text-xl font-bold">{today.kind === 'train' ? `Entreno ${today.routine_name}` : 'Descanso'}</h2>
-            <p className="text-neutral-400 text-sm mt-2">{today.note}</p>
-            <div className="grid grid-cols-3 gap-2 mt-3 text-center text-xs">
-              <div className="bg-neutral-800 rounded-lg py-2">P {today.planned.protein} g</div>
-              <div className="bg-neutral-800 rounded-lg py-2">C {today.planned.carbs} g</div>
-              <div className="bg-neutral-800 rounded-lg py-2">G {today.planned.fat} g</div>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-lime-400 text-xs uppercase">{today.weekday}</p>
+                <h2 className="text-xl font-bold">{today.kind === 'train' ? `Entreno ${today.routine_name}` : 'Descanso'}</h2>
+              </div>
+              <p className="text-sm font-semibold">{today.planned.kcal} kcal</p>
             </div>
-            <p className="text-[11px] text-neutral-500 mt-2">Objetivo: {today.targets.kcal} kcal · {today.targets.protein_g} g P</p>
+            <Macros protein={today.planned.protein} carbs={today.planned.carbs} fat={today.planned.fat} />
+            <p className="text-[11px] text-neutral-500 mt-2">
+              Objetivo {today.targets.kcal} kcal · {today.targets.protein_g} P / {today.targets.carbs_g} C / {today.targets.fat_g} G
+            </p>
           </div>
           {today.meals.map((meal: any) => (
             <button key={meal.recipe_id + meal.slot} onClick={() => setOpenMeal(meal)}
@@ -117,7 +135,9 @@ export default function DietView({ user }: { user: any }) {
                 <span className="text-neutral-500 text-xs">{meal.minutes} min</span>
               </div>
               <p className="font-semibold mt-1">{meal.name}</p>
-              <p className="text-xs text-neutral-400 mt-1">{meal.kcal} kcal · {meal.protein} g P</p>
+              <p className="text-xs text-neutral-400 mt-1">
+                {meal.kcal} kcal · {meal.protein} P / {meal.carbs} C / {meal.fat} G
+              </p>
             </button>
           ))}
         </section>
@@ -130,11 +150,15 @@ export default function DietView({ user }: { user: any }) {
               <p className="text-xs text-neutral-500 uppercase">{d.weekday}</p>
               <p className="font-semibold">{d.kind === 'train' ? d.routine_name : 'Descanso'}</p>
             </div>
-            <p className="text-sm">{d.planned.kcal} kcal</p>
+            <p className="text-sm font-semibold">{d.planned.kcal} kcal</p>
           </div>
+          <Macros protein={d.planned.protein} carbs={d.planned.carbs} fat={d.planned.fat} />
           <ul className="mt-2 space-y-1 text-sm text-neutral-300">
             {d.meals.map((m: any) => (
-              <li key={m.slot + m.recipe_id}><span className="text-neutral-500">{SLOT_LABEL[m.slot]} · </span>{m.name}</li>
+              <li key={m.slot + m.recipe_id}>
+                <span className="text-neutral-500">{SLOT_LABEL[m.slot]} · </span>{m.name}
+                <span className="text-neutral-600 text-xs"> · {m.protein}P {m.carbs}C {m.fat}G</span>
+              </li>
             ))}
           </ul>
         </div>
@@ -153,7 +177,6 @@ export default function DietView({ user }: { user: any }) {
 
       {tab === 'ajuste' && profile && (
         <section className="space-y-4">
-          <p className="text-sm text-neutral-400">El plan lo calcula el backend. No inventa alimentos.</p>
           {goals.map((g) => (
             <button key={g.id} onClick={() => saveProfile({ goal: g.id })}
               className={`text-left w-full rounded-xl p-3 border ${profile.goal === g.id ? 'border-lime-400 bg-lime-400/10' : 'border-neutral-800 bg-neutral-900'}`}>
@@ -163,7 +186,7 @@ export default function DietView({ user }: { user: any }) {
           ))}
           <div>
             <p className="text-xs uppercase text-neutral-500 mb-1">Cómo repartir el día</p>
-            <p className="text-xs text-neutral-500 mb-2">Las kcal las fija el objetivo de arriba. Esto solo cambia el número de tomas.</p>
+            <p className="text-xs text-neutral-500 mb-2">Las kcal las fija el objetivo. Esto solo cambia el número de tomas.</p>
             {[
               { n: 3, title: '3 tomas', desc: 'Desayuno, comida y cena. Platos más grandes.' },
               { n: 4, title: '4 tomas', desc: 'Lo mismo + un snack entre horas.' },
@@ -191,7 +214,8 @@ export default function DietView({ user }: { user: any }) {
           <div className="w-full max-w-md mx-auto bg-neutral-900 rounded-t-3xl p-5 pb-10" onClick={(e) => e.stopPropagation()}>
             <p className="text-lime-400 text-xs uppercase">{SLOT_LABEL[openMeal.slot]}</p>
             <h3 className="text-xl font-bold mt-1">{openMeal.name}</h3>
-            <p className="text-sm text-neutral-400 mt-1">{openMeal.minutes} min · {openMeal.kcal} kcal · {openMeal.protein} g P</p>
+            <p className="text-sm text-neutral-400 mt-1">{openMeal.minutes} min · {openMeal.kcal} kcal</p>
+            <Macros protein={openMeal.protein} carbs={openMeal.carbs} fat={openMeal.fat} />
             <h4 className="mt-4 text-xs uppercase text-neutral-500">Ingredientes</h4>
             <ul className="text-sm mt-1 space-y-1">{openMeal.ingredients.map((i: string) => <li key={i}>· {i}</li>)}</ul>
             <h4 className="mt-4 text-xs uppercase text-neutral-500">Pasos</h4>
