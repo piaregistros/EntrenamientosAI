@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Timer, Dumbbell, ChevronDown, ChevronUp, Loader, AlertTriangle, Info, Trash2 } from 'lucide-react';
+import { Calendar, Timer, Dumbbell, ChevronDown, ChevronUp, Loader, AlertTriangle, Info, Trash2, Sparkles } from 'lucide-react';
 import { WorkoutLog, WorkoutSet, Exercise } from '../types';
 import { apiFetch } from '../lib/api';
 
@@ -12,10 +12,29 @@ interface HistoryListProps {
   onOpenExerciseInfo?: (exercise: Exercise) => void;
 }
 
+type ActivityLog = {
+  id: string;
+  class_id: string;
+  class_name: string;
+  date: string;
+  duration_minutes?: number;
+  rpe?: number | null;
+  notes?: string | null;
+};
+
+type FeedItem =
+  | { kind: 'workout'; date: string; workout: WorkoutLog }
+  | { kind: 'class'; date: string; activity: ActivityLog };
+
+function dayKey(value: string) {
+  return (value || '').slice(0, 10);
+}
+
 export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListProps) {
   const [workouts, setWorkouts] = useState<WorkoutLog[]>([]);
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [exercisesList, setExercisesList] = useState<Exercise[]>([]);
-  const [expandedWorkoutId, setExpandedWorkoutId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,29 +46,24 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
   const fetchHistory = async () => {
     setLoading(true);
     setError(null);
-
     try {
-      const res = await apiFetch(
-        `/api/workouts?user_id=${encodeURIComponent(user.id)}`
-      );
-
-      if (!res.ok) {
-        throw new Error('Error al obtener el historial de entrenamientos');
-      }
-
-      const data = await res.json();
+      const [wRes, aRes, exRes] = await Promise.all([
+        apiFetch(`/api/workouts?user_id=${encodeURIComponent(user.id)}`),
+        apiFetch('/api/activities/log?limit=100'),
+        apiFetch('/api/exercises'),
+      ]);
+      if (!wRes.ok) throw new Error('Error al obtener el historial de entrenamientos');
+      const data = await wRes.json();
       setWorkouts(Array.isArray(data) ? data : []);
-
-      const exRes = await apiFetch('/api/exercises');
-
+      if (aRes.ok) {
+        const aData = await aRes.json();
+        setActivities(Array.isArray(aData.logs) ? aData.logs : []);
+      } else {
+        setActivities([]);
+      }
       if (exRes.ok) {
         const exData = await exRes.json();
-
-        setExercisesList(
-          Array.isArray(exData.exercises)
-            ? exData.exercises
-            : []
-        );
+        setExercisesList(Array.isArray(exData.exercises) ? exData.exercises : []);
       }
     } catch (err: any) {
       setError(err.message || 'Error al conectar con el servidor.');
@@ -58,67 +72,58 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
     }
   };
 
+  const feed: FeedItem[] = [
+    ...workouts.map((workout) => ({ kind: 'workout' as const, date: dayKey(workout.date), workout })),
+    ...activities.map((activity) => ({ kind: 'class' as const, date: dayKey(activity.date), activity })),
+  ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+
   const toggleExpand = (id: string) => {
-    setExpandedWorkoutId(expandedWorkoutId === id ? null : id);
+    setExpandedId(expandedId === id ? null : id);
   };
 
   const handleDeleteWorkout = async (workout: WorkoutLog) => {
     const routineName = workout.routine_name || 'este entrenamiento';
-
     const confirmed = window.confirm(
       `¿Seguro que quieres eliminar ${routineName} del ${new Date(workout.date).toLocaleDateString('es-ES')}?\n\nEsta acción eliminará también todas las series registradas y no se puede deshacer.`
     );
-
     if (!confirmed) return;
-
     try {
       setError(null);
-
-      const res = await apiFetch(
-        `/api/workouts/${encodeURIComponent(workout.id)}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
+      const res = await apiFetch(`/api/workouts/${encodeURIComponent(workout.id)}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(
-          data?.detail || 'Error al eliminar el entrenamiento'
-        );
+        throw new Error(data?.detail || 'Error al eliminar el entrenamiento');
       }
-
-      setWorkouts((current) =>
-        current.filter((item) => item.id !== workout.id)
-      );
-
-      if (expandedWorkoutId === workout.id) {
-        setExpandedWorkoutId(null);
-      }
+      setWorkouts((current) => current.filter((item) => item.id !== workout.id));
+      if (expandedId === workout.id) setExpandedId(null);
     } catch (err: any) {
       setError(err.message || 'Error al eliminar el entrenamiento.');
     }
   };
 
+  const handleDeleteClass = async (activity: ActivityLog) => {
+    const confirmed = window.confirm(`¿Borrar ${activity.class_name} del ${activity.date}?`);
+    if (!confirmed) return;
+    const res = await apiFetch(`/api/activities/log/${activity.id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setActivities((current) => current.filter((item) => item.id !== activity.id));
+    } else {
+      setError('No se pudo borrar la clase');
+    }
+  };
 
   const calculateTotalVolume = (sets: WorkoutSet[] | undefined) => {
     if (!sets) return 0;
-
     return sets.reduce((sum, s) => {
-      const isTimedExercise =
-        s.exercise_name?.trim().toLowerCase() === 'plancha';
-
-      if (s.is_warmup || isTimedExercise) {
-        return sum;
-      }
-
+      const isTimedExercise = s.exercise_name?.trim().toLowerCase() === 'plancha';
+      if (s.is_warmup || isTimedExercise) return sum;
       return sum + s.weight_kg * s.reps;
     }, 0);
   };
 
   const getWorkingSetsCount = (sets: WorkoutSet[] | undefined) => {
     if (!sets) return 0;
-    return sets.filter(s => !s.is_warmup).length;
+    return sets.filter((s) => !s.is_warmup).length;
   };
 
   if (loading) {
@@ -134,7 +139,8 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
     <div id="history-panel-container" className="min-h-screen bg-neutral-950 text-neutral-100 pb-24 px-4 pt-6 max-w-md mx-auto select-none space-y-6">
       <div>
         <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Historial</span>
-        <h2 id="history-header-title" className="text-2xl font-black text-white mt-1">Tus Sesiones</h2>
+        <h2 id="history-header-title" className="text-2xl font-black text-white mt-1">Fuerza y clases</h2>
+        <p className="text-[11px] text-neutral-500 mt-1">A/B/C y Enjoy en la misma línea de tiempo.</p>
       </div>
 
       {error && (
@@ -144,53 +150,70 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
         </div>
       )}
 
-      {workouts.length > 0 ? (
+      {feed.length > 0 ? (
         <div className="space-y-4">
-          {workouts.map((workout) => {
-            const isExpanded = expandedWorkoutId === workout.id;
+          {feed.map((item) => {
+            if (item.kind === 'class') {
+              const activity = item.activity;
+              const formattedDate = new Date(activity.date + 'T12:00:00').toLocaleDateString('es-ES', {
+                day: 'numeric', month: 'long', year: 'numeric',
+              });
+              return (
+                <div key={`class-${activity.id}`} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wide">{formattedDate}</span>
+                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border bg-lime-500/10 border-lime-500/20 text-lime-400">Clase</span>
+                      </div>
+                      <h3 className="text-base font-extrabold text-white leading-tight flex items-center gap-2">
+                        <Sparkles size={14} className="text-lime-400" /> {activity.class_name}
+                      </h3>
+                      <div className="flex items-center gap-4 text-[11px] text-neutral-400 font-medium">
+                        <span>{activity.duration_minutes || '--'} min</span>
+                        {activity.rpe ? <span>{activity.rpe}/10</span> : null}
+                      </div>
+                      {activity.notes ? <p className="text-xs text-neutral-400">{activity.notes}</p> : null}
+                    </div>
+                    <button
+                      onClick={() => handleDeleteClass(activity)}
+                      className="p-1.5 rounded-lg bg-neutral-950 border border-neutral-850 text-neutral-500 hover:text-red-400"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            const workout = item.workout;
+            const isExpanded = expandedId === workout.id;
             const volume = calculateTotalVolume(workout.sets);
             const workingSetsCount = getWorkingSetsCount(workout.sets);
-            
-            // Format nice date e.g. "03 septiembre 2026"
             const formattedDate = new Date(workout.date).toLocaleDateString('es-ES', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
+              day: 'numeric', month: 'long', year: 'numeric',
             });
 
             return (
               <div
-                key={workout.id}
-                id={`history-workout-card-${workout.id}`}
+                key={`wo-${workout.id}`}
                 className={`bg-neutral-900 border transition-all rounded-2xl overflow-hidden ${
                   isExpanded ? 'border-lime-500/50 ring-1 ring-lime-500/20' : 'border-neutral-800 hover:border-neutral-700'
                 }`}
               >
-                {/* Header row click to expand */}
-                <div
-                  id={`history-workout-header-${workout.id}`}
-                  onClick={() => toggleExpand(workout.id)}
-                  className="p-4 cursor-pointer flex justify-between items-start select-none"
-                >
+                <div onClick={() => toggleExpand(workout.id)} className="p-4 cursor-pointer flex justify-between items-start select-none">
                   <div className="space-y-2.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wide">
-                        {formattedDate}
-                      </span>
+                      <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wide">{formattedDate}</span>
                       <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border ${
                         workout.status === 'completed'
                           ? 'bg-lime-500/10 border-lime-500/20 text-lime-400'
                           : 'bg-red-500/10 border-red-500/20 text-red-400'
                       }`}>
-                        {workout.status === 'completed' ? 'Completado' : 'Cancelado'}
+                        {workout.status === 'completed' ? 'Fuerza' : workout.status}
                       </span>
                     </div>
-
-                    <h3 className="text-base font-extrabold text-white leading-tight">
-                      {workout.routine_name}
-                    </h3>
-
-                    {/* Stats strip */}
+                    <h3 className="text-base font-extrabold text-white leading-tight">{workout.routine_name}</h3>
                     <div className="flex items-center gap-4 text-[11px] text-neutral-400 font-medium">
                       <div className="flex items-center gap-1.5">
                         <Timer size={13} className="text-neutral-500" />
@@ -208,60 +231,38 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
                       )}
                     </div>
                   </div>
-
                   <div className="flex items-center gap-2">
                     <button
-                      id={`btn-delete-workout-${workout.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteWorkout(workout);
-                      }}
-                      className="p-1.5 rounded-lg bg-neutral-950 border border-neutral-850 text-neutral-500 hover:text-red-400 hover:border-red-900/60 transition-colors"
-                      title="Eliminar entrenamiento"
-                      aria-label="Eliminar entrenamiento"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteWorkout(workout); }}
+                      className="p-1.5 rounded-lg bg-neutral-950 border border-neutral-850 text-neutral-500 hover:text-red-400"
                     >
                       <Trash2 size={15} />
                     </button>
-
                     <button
-                      id={`btn-expand-workout-${workout.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleExpand(workout.id);
-                      }}
-                      className="p-1.5 rounded-lg bg-neutral-950 border border-neutral-850 text-neutral-400 hover:text-white"
-                      title={isExpanded ? 'Contraer' : 'Ver detalles'}
-                      aria-label={isExpanded ? 'Contraer' : 'Ver detalles'}
+                      onClick={(e) => { e.stopPropagation(); toggleExpand(workout.id); }}
+                      className="p-1.5 rounded-lg bg-neutral-950 border border-neutral-850 text-neutral-400"
                     >
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                   </div>
                 </div>
 
-                {/* Expanded sets summary lists */}
                 {isExpanded && (
-                  <div id={`history-expanded-panel-${workout.id}`} className="bg-neutral-950/60 border-t border-neutral-850 px-4 py-4 space-y-4">
+                  <div className="bg-neutral-950/60 border-t border-neutral-850 px-4 py-4 space-y-4">
                     {workout.notes && (
                       <div className="bg-neutral-900 border border-neutral-850 p-3 rounded-xl">
                         <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wide block">Notas de la sesión</span>
                         <p className="text-xs text-neutral-300 mt-1 italic">"{workout.notes}"</p>
                       </div>
                     )}
-
                     <div className="space-y-3">
                       <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Desglose de Ejercicios</h4>
-                      
                       {workout.sets && workout.sets.length > 0 ? (
                         <div className="space-y-3">
-                          {/* Group sets by exercise_id */}
-                          {(Array.from(new Set(workout.sets.map(s => s.exercise_id))) as string[]).map(exId => {
-                            const exSets = workout.sets!.filter(s => s.exercise_id === exId);
-                            const matchedExercise = exercisesList.find(e => e.id === exId);
-                            const name =
-                              exSets.find(s => s.exercise_name)?.exercise_name ||
-                              matchedExercise?.name ||
-                              'Ejercicio';
-
+                          {(Array.from(new Set(workout.sets.map((s) => s.exercise_id))) as string[]).map((exId) => {
+                            const exSets = workout.sets!.filter((s) => s.exercise_id === exId);
+                            const matchedExercise = exercisesList.find((e) => e.id === exId);
+                            const name = exSets.find((s) => s.exercise_name)?.exercise_name || matchedExercise?.name || 'Ejercicio';
                             return (
                               <div key={exId} className="bg-neutral-900 border border-neutral-850/50 p-3 rounded-xl space-y-2">
                                 <div className="flex justify-between items-center">
@@ -269,12 +270,8 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
                                     <span className="text-xs font-extrabold">{name}</span>
                                     {matchedExercise && onOpenExerciseInfo && (
                                       <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          onOpenExerciseInfo(matchedExercise);
-                                        }}
-                                        className="p-1 text-neutral-500 hover:text-lime-400 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
-                                        title="Ver ficha técnica"
+                                        onClick={(e) => { e.stopPropagation(); onOpenExerciseInfo(matchedExercise); }}
+                                        className="p-1 text-neutral-500 hover:text-lime-400"
                                       >
                                         <Info size={12} />
                                       </button>
@@ -284,7 +281,6 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
                                     {exSets.length} {exSets.length === 1 ? 'serie' : 'series'}
                                   </span>
                                 </div>
-
                                 <div className="grid grid-cols-2 gap-1.5">
                                   {exSets.map((s) => (
                                     <div key={s.id} className="bg-neutral-950 border border-neutral-850/20 px-2 py-1.5 rounded-lg text-[11px] font-mono flex items-center justify-between">
@@ -294,8 +290,7 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
                                       <span className="text-white font-bold">
                                         {s.exercise_name?.trim().toLowerCase() === 'plancha'
                                           ? `${s.reps}s`
-                                          : `${s.weight_kg}kg × ${s.reps} ${s.rir !== null ? `(RIR ${s.rir})` : ''}`
-                                        }
+                                          : `${s.weight_kg}kg × ${s.reps} ${s.rir !== null ? `(RIR ${s.rir})` : ''}`}
                                       </span>
                                     </div>
                                   ))}
@@ -315,12 +310,10 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
           })}
         </div>
       ) : (
-        <div id="history-empty" className="bg-neutral-900 border border-neutral-800 rounded-2xl p-12 text-center space-y-4 shadow-lg">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-12 text-center space-y-4">
           <Calendar className="mx-auto text-neutral-700" size={32} />
-          <h3 className="text-sm font-extrabold text-white">Sin entrenamientos</h3>
-          <p className="text-xs text-neutral-500 leading-relaxed max-w-[240px] mx-auto">
-            Aún no has registrado ningún entrenamiento completado. ¡Comienza uno hoy!
-          </p>
+          <h3 className="text-sm font-extrabold text-white">Sin sesiones</h3>
+          <p className="text-xs text-neutral-500">Todavía no hay fuerza ni clases apuntadas.</p>
         </div>
       )}
     </div>
