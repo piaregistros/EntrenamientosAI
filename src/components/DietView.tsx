@@ -62,31 +62,34 @@ export default function DietView({ user }: { user: any }) {
   useEffect(() => { load(); }, []);
 
   const saveProfile = async (patch: Record<string, unknown>, fromRegen = false) => {
-    setSaving(true);
-    setFlash(fromRegen ? 'Generando menú…' : 'Guardando…');
     setError('');
+    setSaving(true);
+    setFlash(fromRegen ? 'Generando menú nuevo…' : 'Aplicando cambios…');
     const body = { ...profile, ...patch };
-    const res = await apiFetch('/api/diet/profile', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        goal: body.goal,
-        meals_per_day: Number(body.meals_per_day || 4),
-        weight_kg: body.weight_kg ? Number(body.weight_kg) : null,
-        notes: body.notes || null,
-      }),
-    });
-    if (res.ok) {
+    try {
+      const res = await apiFetch('/api/diet/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          goal: body.goal,
+          meals_per_day: Number(body.meals_per_day || 4),
+          weight_kg: body.weight_kg ? Number(body.weight_kg) : null,
+          notes: body.notes || null,
+        }),
+      });
+      if (!res.ok) throw new Error('perfil');
       setProfile(await res.json());
-      await apiFetch('/api/diet/week/generate', { method: 'POST' });
+      const gen = await apiFetch('/api/diet/week/generate', { method: 'POST' });
+      if (!gen.ok) throw new Error('semana');
       await load();
-      setFlash(fromRegen ? 'Semana nueva lista. Mírala en Semana.' : 'Cambios aplicados.');
-      setTimeout(() => setFlash(''), 4000);
-    } else {
+      setFlash(fromRegen ? 'Listo. Semana nueva creada.' : 'Cambios guardados.');
+      setTimeout(() => setFlash(''), 5000);
+    } catch {
       setFlash('');
-      setError('No se pudo guardar.');
+      setError('No se pudo completar. Prueba otra vez.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const loadShopping = async () => {
@@ -110,7 +113,11 @@ export default function DietView({ user }: { user: any }) {
       </h1>
 
       {error && <div className="mt-4 text-sm bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-3">{error}</div>}
-      {flash && <div className="mt-4 text-sm bg-lime-400/15 border border-lime-400/40 text-lime-300 rounded-xl p-3">{flash}</div>}
+      {flash && (
+        <div className="mt-4 text-sm bg-lime-400 text-neutral-950 font-semibold rounded-xl p-3">
+          {flash}
+        </div>
+      )}
 
       <div className="flex gap-1 bg-neutral-900 rounded-xl p-1 my-5">
         {(['hoy', 'semana', 'lista', 'ajuste'] as const).map((id) => (
@@ -211,10 +218,8 @@ export default function DietView({ user }: { user: any }) {
           <input type="number" defaultValue={profile.weight_kg || ''} placeholder="Peso kg"
             className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3"
             onBlur={(e) => { if (e.target.value) saveProfile({ weight_kg: Number(e.target.value) }); }} />
-          <button disabled={saving} onClick={() => saveProfile({}, true)}
-            className={`w-full flex items-center justify-center gap-2 font-bold rounded-xl py-3 ${
-              saving ? 'bg-lime-400/60 text-neutral-950' : 'bg-lime-400 text-neutral-950'
-            }`}>
+          <button type="button" disabled={saving} onClick={() => saveProfile({}, true)}
+            className="w-full flex items-center justify-center gap-2 bg-lime-400 text-neutral-950 font-bold rounded-xl py-3 disabled:opacity-70">
             <RefreshCw size={16} className={saving ? 'animate-spin' : ''} />
             {saving ? 'Generando menú…' : 'Regenerar semana'}
           </button>
