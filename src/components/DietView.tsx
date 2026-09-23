@@ -38,6 +38,7 @@ export default function DietView({ user }: { user: any }) {
   const [shopping, setShopping] = useState<any[]>([]);
   const [openMeal, setOpenMeal] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [swapping, setSwapping] = useState('');
   const [flash, setFlash] = useState('');
   const [error, setError] = useState('');
 
@@ -60,6 +61,37 @@ export default function DietView({ user }: { user: any }) {
   };
 
   useEffect(() => { load(); }, []);
+
+  const swapMeal = async (dayDate: string, slot: string) => {
+    const key = dayDate + slot;
+    setSwapping(key);
+    setFlash('Buscando alternativa…');
+    try {
+      const res = await apiFetch('/api/diet/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dayDate, slot }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || 'swap');
+      if (data.week) setWeek(data.week);
+      if (data.day && today && data.day.date === today.date) {
+        setToday(data.day);
+        const next = data.day.meals.find((m: any) => m.slot === slot);
+        if (next) setOpenMeal(next);
+        setFlash(`Ahora: ${next?.name || 'otro plato'}`);
+      } else {
+        setFlash('Plato cambiado');
+        await load();
+      }
+      setTimeout(() => setFlash(''), 3500);
+    } catch {
+      setFlash('');
+      setError('No había alternativa o falló el cambio.');
+    } finally {
+      setSwapping('');
+    }
+  };
 
   const saveProfile = async (patch: Record<string, unknown>, fromRegen = false) => {
     setError('');
@@ -139,22 +171,25 @@ export default function DietView({ user }: { user: any }) {
               <p className="text-sm font-semibold">{today.planned.kcal} kcal</p>
             </div>
             <Macros protein={today.planned.protein} carbs={today.planned.carbs} fat={today.planned.fat} />
-            <p className="text-[11px] text-neutral-500 mt-2">
-              Objetivo {today.targets.kcal} kcal · {today.targets.protein_g} P / {today.targets.carbs_g} C / {today.targets.fat_g} G
-            </p>
           </div>
           {today.meals.map((meal: any) => (
-            <button key={meal.recipe_id + meal.slot} onClick={() => setOpenMeal(meal)}
-              className="w-full text-left rounded-2xl border border-neutral-800 bg-neutral-900 p-4 mb-3">
-              <div className="flex justify-between">
-                <span className="text-lime-400 text-[11px] uppercase">{SLOT_LABEL[meal.slot] || meal.slot}</span>
-                <span className="text-neutral-500 text-xs">{meal.minutes} min</span>
-              </div>
-              <p className="font-semibold mt-1">{meal.name}</p>
-              <p className="text-xs text-neutral-400 mt-1">
-                {meal.kcal} kcal · {meal.protein} P / {meal.carbs} C / {meal.fat} G
-              </p>
-            </button>
+            <div key={meal.recipe_id + meal.slot} className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 mb-3">
+              <button type="button" onClick={() => setOpenMeal(meal)} className="w-full text-left">
+                <div className="flex justify-between">
+                  <span className="text-lime-400 text-[11px] uppercase">{SLOT_LABEL[meal.slot] || meal.slot}</span>
+                  <span className="text-neutral-500 text-xs">{meal.minutes} min</span>
+                </div>
+                <p className="font-semibold mt-1">{meal.name}</p>
+                <p className="text-xs text-neutral-400 mt-1">
+                  {meal.kcal} kcal · {meal.protein} P / {meal.carbs} C / {meal.fat} G
+                </p>
+              </button>
+              <button type="button" disabled={!!swapping}
+                onClick={() => swapMeal(today.date, meal.slot)}
+                className="mt-3 w-full text-xs font-semibold border border-neutral-700 rounded-xl py-2 text-lime-400">
+                {swapping === today.date + meal.slot ? 'Cambiando…' : 'Otra alternativa'}
+              </button>
+            </div>
           ))}
         </section>
       )}
@@ -168,12 +203,14 @@ export default function DietView({ user }: { user: any }) {
             </div>
             <p className="text-sm font-semibold">{d.planned.kcal} kcal</p>
           </div>
-          <Macros protein={d.planned.protein} carbs={d.planned.carbs} fat={d.planned.fat} />
-          <ul className="mt-2 space-y-1 text-sm text-neutral-300">
+          <ul className="mt-2 space-y-2 text-sm text-neutral-300">
             {d.meals.map((m: any) => (
-              <li key={m.slot + m.recipe_id}>
-                <span className="text-neutral-500">{SLOT_LABEL[m.slot]} · </span>{m.name}
-                <span className="text-neutral-600 text-xs"> · {m.protein}P {m.carbs}C {m.fat}G</span>
+              <li key={m.slot + m.recipe_id} className="flex items-center justify-between gap-2">
+                <span><span className="text-neutral-500">{SLOT_LABEL[m.slot]} · </span>{m.name}</span>
+                <button type="button" disabled={!!swapping} onClick={() => swapMeal(d.date, m.slot)}
+                  className="shrink-0 text-[10px] uppercase text-lime-400">
+                  {swapping === d.date + m.slot ? '…' : 'Otra'}
+                </button>
               </li>
             ))}
           </ul>
@@ -200,26 +237,8 @@ export default function DietView({ user }: { user: any }) {
               <p className="text-xs text-neutral-400 mt-1">{g.summary}</p>
             </button>
           ))}
-          <div>
-            <p className="text-xs uppercase text-neutral-500 mb-1">Cómo repartir el día</p>
-            <p className="text-xs text-neutral-500 mb-2">Las kcal las fija el objetivo. Esto solo cambia el número de tomas.</p>
-            {[
-              { n: 3, title: '3 tomas', desc: 'Desayuno, comida y cena. Platos más grandes.' },
-              { n: 4, title: '4 tomas', desc: 'Lo mismo + un snack entre horas.' },
-              { n: 5, title: '5 tomas', desc: 'Snack + algo peri-entreno los días A/B/C.' },
-            ].map((opt) => (
-              <button key={opt.n} disabled={saving} onClick={() => saveProfile({ meals_per_day: opt.n })}
-                className={`text-left w-full rounded-xl p-3 border mb-2 ${Number(profile.meals_per_day) === opt.n ? 'border-lime-400 bg-lime-400/10' : 'border-neutral-800 bg-neutral-900'}`}>
-                <p className="font-semibold">{opt.title}</p>
-                <p className="text-xs text-neutral-400 mt-1">{opt.desc}</p>
-              </button>
-            ))}
-          </div>
-          <input type="number" defaultValue={profile.weight_kg || ''} placeholder="Peso kg"
-            className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3"
-            onBlur={(e) => { if (e.target.value) saveProfile({ weight_kg: Number(e.target.value) }); }} />
           <button type="button" disabled={saving} onClick={() => saveProfile({}, true)}
-            className="w-full flex items-center justify-center gap-2 bg-lime-400 text-neutral-950 font-bold rounded-xl py-3 disabled:opacity-70">
+            className="w-full flex items-center justify-center gap-2 bg-lime-400 text-neutral-950 font-bold rounded-xl py-3">
             <RefreshCw size={16} className={saving ? 'animate-spin' : ''} />
             {saving ? 'Generando menú…' : 'Regenerar semana'}
           </button>
@@ -237,8 +256,12 @@ export default function DietView({ user }: { user: any }) {
             <ul className="text-sm mt-1 space-y-1">{openMeal.ingredients.map((i: string) => <li key={i}>· {i}</li>)}</ul>
             <h4 className="mt-4 text-xs uppercase text-neutral-500">Pasos</h4>
             <ol className="text-sm mt-1 space-y-1 list-decimal pl-4">{openMeal.steps.map((s: string) => <li key={s}>{s}</li>)}</ol>
+            <button type="button" disabled={!!swapping} onClick={() => swapMeal(today.date, openMeal.slot)}
+              className="mt-4 w-full border border-lime-400 text-lime-400 font-bold rounded-xl py-3">
+              Otra alternativa
+            </button>
             <button onClick={() => { markEaten(openMeal, today.date); setOpenMeal(null); }}
-              className="mt-5 w-full bg-lime-400 text-neutral-950 font-bold rounded-xl py-3 flex items-center justify-center gap-2">
+              className="mt-2 w-full bg-lime-400 text-neutral-950 font-bold rounded-xl py-3 flex items-center justify-center gap-2">
               <Check size={16} /> Marcar como hecha
             </button>
           </div>
