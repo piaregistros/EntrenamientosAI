@@ -38,6 +38,8 @@ export default function DietView({ user }: { user: any }) {
   const [shopping, setShopping] = useState<any[]>([]);
   const [openMeal, setOpenMeal] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [swapping, setSwapping] = useState('');
+  const [flash, setFlash] = useState('');
   const [error, setError] = useState('');
 
   const load = async () => {
@@ -60,25 +62,65 @@ export default function DietView({ user }: { user: any }) {
 
   useEffect(() => { load(); }, []);
 
-  const saveProfile = async (patch: Record<string, unknown>) => {
-    setSaving(true);
-    const body = { ...profile, ...patch };
-    const res = await apiFetch('/api/diet/profile', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        goal: body.goal,
-        meals_per_day: Number(body.meals_per_day || 4),
-        weight_kg: body.weight_kg ? Number(body.weight_kg) : null,
-        notes: body.notes || null,
-      }),
-    });
-    if (res.ok) {
-      setProfile(await res.json());
-      await apiFetch('/api/diet/week/generate', { method: 'POST' });
-      await load();
+  const swapMeal = async (dayDate: string, slot: string) => {
+    setSwapping(dayDate + slot);
+    setFlash('Buscando alternativa…');
+    try {
+      const res = await apiFetch('/api/diet/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dayDate, slot }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || 'swap');
+      if (data.week) setWeek(data.week);
+      if (data.day && today && data.day.date === today.date) {
+        setToday(data.day);
+        const next = data.day.meals.find((m: any) => m.slot === slot);
+        if (next) setOpenMeal(next);
+        setFlash(`Ahora: ${next?.name || 'otro plato'}`);
+      } else {
+        setFlash('Plato cambiado');
+        await load();
+      }
+      setTimeout(() => setFlash(''), 3500);
+    } catch {
+      setFlash('');
+      setError('No había alternativa o falló el cambio.');
+    } finally {
+      setSwapping('');
     }
-    setSaving(false);
+  };
+
+  const saveProfile = async (patch: Record<string, unknown>, fromRegen = false) => {
+    setError('');
+    setSaving(true);
+    setFlash(fromRegen ? 'Generando menú nuevo…' : 'Aplicando cambios…');
+    const body = { ...profile, ...patch };
+    try {
+      const res = await apiFetch('/api/diet/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          goal: body.goal,
+          meals_per_day: Number(body.meals_per_day || 4),
+          weight_kg: body.weight_kg ? Number(body.weight_kg) : null,
+          notes: body.notes || null,
+        }),
+      });
+      if (!res.ok) throw new Error('perfil');
+      setProfile(await res.json());
+      const gen = await apiFetch('/api/diet/week/generate', { method: 'POST' });
+      if (!gen.ok) throw new Error('semana');
+      await load();
+      setFlash(fromRegen ? 'Listo. Semana nueva creada.' : 'Cambios guardados.');
+      setTimeout(() => setFlash(''), 5000);
+    } catch {
+      setFlash('');
+      setError('No se pudo completar. Prueba otra vez.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const loadShopping = async () => {
@@ -100,49 +142,40 @@ export default function DietView({ user }: { user: any }) {
       <h1 className="text-2xl font-bold mt-1 flex items-center gap-2">
         <Utensils size={22} className="text-lime-400" /> Dieta A/B/C
       </h1>
-
       {error && <div className="mt-4 text-sm bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-3">{error}</div>}
-
+      {flash && <div className="mt-4 text-sm bg-lime-400 text-neutral-950 font-semibold rounded-xl p-3">{flash}</div>}
       <div className="flex gap-1 bg-neutral-900 rounded-xl p-1 my-5">
         {(['hoy', 'semana', 'lista', 'ajuste'] as const).map((id) => (
           <button key={id} onClick={() => { setTab(id); if (id === 'lista') loadShopping(); }}
-            className={`flex-1 text-[11px] uppercase py-2 rounded-lg font-semibold ${tab === id ? 'bg-lime-400 text-neutral-950' : 'text-neutral-400'}`}>
-            {id}
-          </button>
+            className={`flex-1 text-[11px] uppercase py-2 rounded-lg font-semibold ${tab === id ? 'bg-lime-400 text-neutral-950' : 'text-neutral-400'}`}>{id}</button>
         ))}
       </div>
-
       {tab === 'hoy' && today && (
         <section>
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 mb-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-lime-400 text-xs uppercase">{today.weekday}</p>
-                <h2 className="text-xl font-bold">{today.kind === 'train' ? `Entreno ${today.routine_name}` : 'Descanso'}</h2>
-              </div>
-              <p className="text-sm font-semibold">{today.planned.kcal} kcal</p>
-            </div>
+            <p className="text-lime-400 text-xs uppercase">{today.weekday}</p>
+            <h2 className="text-xl font-bold">{today.kind === 'train' ? `Entreno ${today.routine_name}` : 'Descanso'}</h2>
+            <p className="text-sm font-semibold mt-1">{today.planned.kcal} kcal</p>
             <Macros protein={today.planned.protein} carbs={today.planned.carbs} fat={today.planned.fat} />
-            <p className="text-[11px] text-neutral-500 mt-2">
-              Objetivo {today.targets.kcal} kcal · {today.targets.protein_g} P / {today.targets.carbs_g} C / {today.targets.fat_g} G
-            </p>
           </div>
           {today.meals.map((meal: any) => (
-            <button key={meal.recipe_id + meal.slot} onClick={() => setOpenMeal(meal)}
-              className="w-full text-left rounded-2xl border border-neutral-800 bg-neutral-900 p-4 mb-3">
-              <div className="flex justify-between">
-                <span className="text-lime-400 text-[11px] uppercase">{SLOT_LABEL[meal.slot] || meal.slot}</span>
-                <span className="text-neutral-500 text-xs">{meal.minutes} min</span>
-              </div>
-              <p className="font-semibold mt-1">{meal.name}</p>
-              <p className="text-xs text-neutral-400 mt-1">
-                {meal.kcal} kcal · {meal.protein} P / {meal.carbs} C / {meal.fat} G
-              </p>
-            </button>
+            <div key={meal.recipe_id + meal.slot} className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 mb-3">
+              <button type="button" onClick={() => setOpenMeal(meal)} className="w-full text-left">
+                <div className="flex justify-between">
+                  <span className="text-lime-400 text-[11px] uppercase">{SLOT_LABEL[meal.slot] || meal.slot}</span>
+                  <span className="text-neutral-500 text-xs">{meal.minutes} min</span>
+                </div>
+                <p className="font-semibold mt-1">{meal.name}</p>
+                <p className="text-xs text-neutral-400 mt-1">{meal.kcal} kcal · {meal.protein} P / {meal.carbs} C / {meal.fat} G</p>
+              </button>
+              <button type="button" disabled={!!swapping} onClick={() => swapMeal(today.date, meal.slot)}
+                className="mt-3 w-full text-xs font-semibold border border-neutral-700 rounded-xl py-2 text-lime-400">
+                {swapping === today.date + meal.slot ? 'Cambiando…' : 'Otra alternativa'}
+              </button>
+            </div>
           ))}
         </section>
       )}
-
       {tab === 'semana' && week && week.days.map((d: any) => (
         <div key={d.date} className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 mb-3">
           <div className="flex justify-between">
@@ -152,18 +185,18 @@ export default function DietView({ user }: { user: any }) {
             </div>
             <p className="text-sm font-semibold">{d.planned.kcal} kcal</p>
           </div>
-          <Macros protein={d.planned.protein} carbs={d.planned.carbs} fat={d.planned.fat} />
-          <ul className="mt-2 space-y-1 text-sm text-neutral-300">
+          <ul className="mt-2 space-y-2 text-sm text-neutral-300">
             {d.meals.map((m: any) => (
-              <li key={m.slot + m.recipe_id}>
-                <span className="text-neutral-500">{SLOT_LABEL[m.slot]} · </span>{m.name}
-                <span className="text-neutral-600 text-xs"> · {m.protein}P {m.carbs}C {m.fat}G</span>
+              <li key={m.slot + m.recipe_id} className="flex items-center justify-between gap-2">
+                <span><span className="text-neutral-500">{SLOT_LABEL[m.slot]} · </span>{m.name}</span>
+                <button type="button" disabled={!!swapping} onClick={() => swapMeal(d.date, m.slot)} className="shrink-0 text-[10px] uppercase text-lime-400">
+                  {swapping === d.date + m.slot ? '…' : 'Otra'}
+                </button>
               </li>
             ))}
           </ul>
         </div>
       ))}
-
       {tab === 'lista' && (
         <section>
           <div className="flex items-center gap-2 mb-3 text-lime-400"><ShoppingCart size={16} /><h2 className="font-semibold">Lista de la compra</h2></div>
@@ -174,11 +207,10 @@ export default function DietView({ user }: { user: any }) {
           ))}
         </section>
       )}
-
       {tab === 'ajuste' && profile && (
         <section className="space-y-4">
           {goals.map((g) => (
-            <button key={g.id} onClick={() => saveProfile({ goal: g.id })}
+            <button key={g.id} disabled={saving} onClick={() => saveProfile({ goal: g.id })}
               className={`text-left w-full rounded-xl p-3 border ${profile.goal === g.id ? 'border-lime-400 bg-lime-400/10' : 'border-neutral-800 bg-neutral-900'}`}>
               <p className="font-semibold">{g.name}</p>
               <p className="text-xs text-neutral-400 mt-1">{g.summary}</p>
@@ -192,7 +224,7 @@ export default function DietView({ user }: { user: any }) {
               { n: 4, title: '4 tomas', desc: 'Lo mismo + un snack entre horas.' },
               { n: 5, title: '5 tomas', desc: 'Snack + algo peri-entreno los días A/B/C.' },
             ].map((opt) => (
-              <button key={opt.n} onClick={() => saveProfile({ meals_per_day: opt.n })}
+              <button key={opt.n} disabled={saving} onClick={() => saveProfile({ meals_per_day: opt.n })}
                 className={`text-left w-full rounded-xl p-3 border mb-2 ${Number(profile.meals_per_day) === opt.n ? 'border-lime-400 bg-lime-400/10' : 'border-neutral-800 bg-neutral-900'}`}>
                 <p className="font-semibold">{opt.title}</p>
                 <p className="text-xs text-neutral-400 mt-1">{opt.desc}</p>
@@ -202,13 +234,13 @@ export default function DietView({ user }: { user: any }) {
           <input type="number" defaultValue={profile.weight_kg || ''} placeholder="Peso kg"
             className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3"
             onBlur={(e) => { if (e.target.value) saveProfile({ weight_kg: Number(e.target.value) }); }} />
-          <button disabled={saving} onClick={() => saveProfile({})}
+          <button type="button" disabled={saving} onClick={() => saveProfile({}, true)}
             className="w-full flex items-center justify-center gap-2 bg-lime-400 text-neutral-950 font-bold rounded-xl py-3">
-            <RefreshCw size={16} /> Regenerar semana
+            <RefreshCw size={16} className={saving ? 'animate-spin' : ''} />
+            {saving ? 'Generando menú…' : 'Regenerar semana'}
           </button>
         </section>
       )}
-
       {openMeal && today && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-end" onClick={() => setOpenMeal(null)}>
           <div className="w-full max-w-md mx-auto bg-neutral-900 rounded-t-3xl p-5 pb-10" onClick={(e) => e.stopPropagation()}>
@@ -220,8 +252,10 @@ export default function DietView({ user }: { user: any }) {
             <ul className="text-sm mt-1 space-y-1">{openMeal.ingredients.map((i: string) => <li key={i}>· {i}</li>)}</ul>
             <h4 className="mt-4 text-xs uppercase text-neutral-500">Pasos</h4>
             <ol className="text-sm mt-1 space-y-1 list-decimal pl-4">{openMeal.steps.map((s: string) => <li key={s}>{s}</li>)}</ol>
+            <button type="button" disabled={!!swapping} onClick={() => swapMeal(today.date, openMeal.slot)}
+              className="mt-4 w-full border border-lime-400 text-lime-400 font-bold rounded-xl py-3">Otra alternativa</button>
             <button onClick={() => { markEaten(openMeal, today.date); setOpenMeal(null); }}
-              className="mt-5 w-full bg-lime-400 text-neutral-950 font-bold rounded-xl py-3 flex items-center justify-center gap-2">
+              className="mt-2 w-full bg-lime-400 text-neutral-950 font-bold rounded-xl py-3 flex items-center justify-center gap-2">
               <Check size={16} /> Marcar como hecha
             </button>
           </div>
