@@ -8,6 +8,7 @@ import StatsView from './components/StatsView';
 import ProfileView from './components/ProfileView';
 import DietView from './components/DietView';
 import ExerciseInfo from './components/ExerciseInfo';
+import ActivitiesPanel from './components/ActivitiesPanel';
 import { Exercise } from './types';
 
 export default function App() {
@@ -100,8 +101,13 @@ export default function App() {
   return (
     <div className="bg-neutral-950 min-h-screen">
       {activeTab === 'home' && (
-        <Dashboard user={user} onStartWorkout={(id) => { setActiveWorkoutId(null); setActiveRoutineId(id); }}
-          onNavigateToTab={(tab) => setActiveTab(tab)} onOpenExerciseInfo={handleOpenExerciseInfo} />
+        <>
+          <Dashboard user={user} onStartWorkout={(id) => { setActiveWorkoutId(null); setActiveRoutineId(id); }}
+            onNavigateToTab={(tab) => setActiveTab(tab)} onOpenExerciseInfo={handleOpenExerciseInfo} />
+          <div className="max-w-md mx-auto px-4 -mt-2 pb-28">
+            <ActivitiesPanel />
+          </div>
+        </>
       )}
       {activeTab === 'history' && <HistoryList user={user} onOpenExerciseInfo={handleOpenExerciseInfo} />}
       {activeTab === 'stats' && <StatsView user={user} />}
