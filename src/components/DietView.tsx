@@ -63,8 +63,7 @@ export default function DietView({ user }: { user: any }) {
   useEffect(() => { load(); }, []);
 
   const swapMeal = async (dayDate: string, slot: string) => {
-    const key = dayDate + slot;
-    setSwapping(key);
+    setSwapping(dayDate + slot);
     setFlash('Buscando alternativa…');
     try {
       const res = await apiFetch('/api/diet/swap', {
@@ -143,33 +142,20 @@ export default function DietView({ user }: { user: any }) {
       <h1 className="text-2xl font-bold mt-1 flex items-center gap-2">
         <Utensils size={22} className="text-lime-400" /> Dieta A/B/C
       </h1>
-
       {error && <div className="mt-4 text-sm bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-3">{error}</div>}
-      {flash && (
-        <div className="mt-4 text-sm bg-lime-400 text-neutral-950 font-semibold rounded-xl p-3">
-          {flash}
-        </div>
-      )}
-
+      {flash && <div className="mt-4 text-sm bg-lime-400 text-neutral-950 font-semibold rounded-xl p-3">{flash}</div>}
       <div className="flex gap-1 bg-neutral-900 rounded-xl p-1 my-5">
         {(['hoy', 'semana', 'lista', 'ajuste'] as const).map((id) => (
           <button key={id} onClick={() => { setTab(id); if (id === 'lista') loadShopping(); }}
-            className={`flex-1 text-[11px] uppercase py-2 rounded-lg font-semibold ${tab === id ? 'bg-lime-400 text-neutral-950' : 'text-neutral-400'}`}>
-            {id}
-          </button>
+            className={`flex-1 text-[11px] uppercase py-2 rounded-lg font-semibold ${tab === id ? 'bg-lime-400 text-neutral-950' : 'text-neutral-400'}`}>{id}</button>
         ))}
       </div>
-
       {tab === 'hoy' && today && (
         <section>
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 mb-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-lime-400 text-xs uppercase">{today.weekday}</p>
-                <h2 className="text-xl font-bold">{today.kind === 'train' ? `Entreno ${today.routine_name}` : 'Descanso'}</h2>
-              </div>
-              <p className="text-sm font-semibold">{today.planned.kcal} kcal</p>
-            </div>
+            <p className="text-lime-400 text-xs uppercase">{today.weekday}</p>
+            <h2 className="text-xl font-bold">{today.kind === 'train' ? `Entreno ${today.routine_name}` : 'Descanso'}</h2>
+            <p className="text-sm font-semibold mt-1">{today.planned.kcal} kcal</p>
             <Macros protein={today.planned.protein} carbs={today.planned.carbs} fat={today.planned.fat} />
           </div>
           {today.meals.map((meal: any) => (
@@ -180,12 +166,9 @@ export default function DietView({ user }: { user: any }) {
                   <span className="text-neutral-500 text-xs">{meal.minutes} min</span>
                 </div>
                 <p className="font-semibold mt-1">{meal.name}</p>
-                <p className="text-xs text-neutral-400 mt-1">
-                  {meal.kcal} kcal · {meal.protein} P / {meal.carbs} C / {meal.fat} G
-                </p>
+                <p className="text-xs text-neutral-400 mt-1">{meal.kcal} kcal · {meal.protein} P / {meal.carbs} C / {meal.fat} G</p>
               </button>
-              <button type="button" disabled={!!swapping}
-                onClick={() => swapMeal(today.date, meal.slot)}
+              <button type="button" disabled={!!swapping} onClick={() => swapMeal(today.date, meal.slot)}
                 className="mt-3 w-full text-xs font-semibold border border-neutral-700 rounded-xl py-2 text-lime-400">
                 {swapping === today.date + meal.slot ? 'Cambiando…' : 'Otra alternativa'}
               </button>
@@ -193,7 +176,6 @@ export default function DietView({ user }: { user: any }) {
           ))}
         </section>
       )}
-
       {tab === 'semana' && week && week.days.map((d: any) => (
         <div key={d.date} className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 mb-3">
           <div className="flex justify-between">
@@ -207,8 +189,7 @@ export default function DietView({ user }: { user: any }) {
             {d.meals.map((m: any) => (
               <li key={m.slot + m.recipe_id} className="flex items-center justify-between gap-2">
                 <span><span className="text-neutral-500">{SLOT_LABEL[m.slot]} · </span>{m.name}</span>
-                <button type="button" disabled={!!swapping} onClick={() => swapMeal(d.date, m.slot)}
-                  className="shrink-0 text-[10px] uppercase text-lime-400">
+                <button type="button" disabled={!!swapping} onClick={() => swapMeal(d.date, m.slot)} className="shrink-0 text-[10px] uppercase text-lime-400">
                   {swapping === d.date + m.slot ? '…' : 'Otra'}
                 </button>
               </li>
@@ -216,7 +197,6 @@ export default function DietView({ user }: { user: any }) {
           </ul>
         </div>
       ))}
-
       {tab === 'lista' && (
         <section>
           <div className="flex items-center gap-2 mb-3 text-lime-400"><ShoppingCart size={16} /><h2 className="font-semibold">Lista de la compra</h2></div>
@@ -227,7 +207,6 @@ export default function DietView({ user }: { user: any }) {
           ))}
         </section>
       )}
-
       {tab === 'ajuste' && profile && (
         <section className="space-y-4">
           {goals.map((g) => (
@@ -237,6 +216,24 @@ export default function DietView({ user }: { user: any }) {
               <p className="text-xs text-neutral-400 mt-1">{g.summary}</p>
             </button>
           ))}
+          <div>
+            <p className="text-xs uppercase text-neutral-500 mb-1">Cómo repartir el día</p>
+            <p className="text-xs text-neutral-500 mb-2">Las kcal las fija el objetivo. Esto solo cambia el número de tomas.</p>
+            {[
+              { n: 3, title: '3 tomas', desc: 'Desayuno, comida y cena. Platos más grandes.' },
+              { n: 4, title: '4 tomas', desc: 'Lo mismo + un snack entre horas.' },
+              { n: 5, title: '5 tomas', desc: 'Snack + algo peri-entreno los días A/B/C.' },
+            ].map((opt) => (
+              <button key={opt.n} disabled={saving} onClick={() => saveProfile({ meals_per_day: opt.n })}
+                className={`text-left w-full rounded-xl p-3 border mb-2 ${Number(profile.meals_per_day) === opt.n ? 'border-lime-400 bg-lime-400/10' : 'border-neutral-800 bg-neutral-900'}`}>
+                <p className="font-semibold">{opt.title}</p>
+                <p className="text-xs text-neutral-400 mt-1">{opt.desc}</p>
+              </button>
+            ))}
+          </div>
+          <input type="number" defaultValue={profile.weight_kg || ''} placeholder="Peso kg"
+            className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3"
+            onBlur={(e) => { if (e.target.value) saveProfile({ weight_kg: Number(e.target.value) }); }} />
           <button type="button" disabled={saving} onClick={() => saveProfile({}, true)}
             className="w-full flex items-center justify-center gap-2 bg-lime-400 text-neutral-950 font-bold rounded-xl py-3">
             <RefreshCw size={16} className={saving ? 'animate-spin' : ''} />
@@ -244,7 +241,6 @@ export default function DietView({ user }: { user: any }) {
           </button>
         </section>
       )}
-
       {openMeal && today && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-end" onClick={() => setOpenMeal(null)}>
           <div className="w-full max-w-md mx-auto bg-neutral-900 rounded-t-3xl p-5 pb-10" onClick={(e) => e.stopPropagation()}>
@@ -257,9 +253,7 @@ export default function DietView({ user }: { user: any }) {
             <h4 className="mt-4 text-xs uppercase text-neutral-500">Pasos</h4>
             <ol className="text-sm mt-1 space-y-1 list-decimal pl-4">{openMeal.steps.map((s: string) => <li key={s}>{s}</li>)}</ol>
             <button type="button" disabled={!!swapping} onClick={() => swapMeal(today.date, openMeal.slot)}
-              className="mt-4 w-full border border-lime-400 text-lime-400 font-bold rounded-xl py-3">
-              Otra alternativa
-            </button>
+              className="mt-4 w-full border border-lime-400 text-lime-400 font-bold rounded-xl py-3">Otra alternativa</button>
             <button onClick={() => { markEaten(openMeal, today.date); setOpenMeal(null); }}
               className="mt-2 w-full bg-lime-400 text-neutral-950 font-bold rounded-xl py-3 flex items-center justify-center gap-2">
               <Check size={16} /> Marcar como hecha
