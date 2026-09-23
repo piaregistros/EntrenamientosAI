@@ -38,6 +38,7 @@ export default function DietView({ user }: { user: any }) {
   const [shopping, setShopping] = useState<any[]>([]);
   const [openMeal, setOpenMeal] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState('');
   const [error, setError] = useState('');
 
   const load = async () => {
@@ -60,8 +61,10 @@ export default function DietView({ user }: { user: any }) {
 
   useEffect(() => { load(); }, []);
 
-  const saveProfile = async (patch: Record<string, unknown>) => {
+  const saveProfile = async (patch: Record<string, unknown>, fromRegen = false) => {
     setSaving(true);
+    setFlash(fromRegen ? 'Generando menú…' : 'Guardando…');
+    setError('');
     const body = { ...profile, ...patch };
     const res = await apiFetch('/api/diet/profile', {
       method: 'PUT',
@@ -77,6 +80,11 @@ export default function DietView({ user }: { user: any }) {
       setProfile(await res.json());
       await apiFetch('/api/diet/week/generate', { method: 'POST' });
       await load();
+      setFlash(fromRegen ? 'Semana nueva lista. Mírala en Semana.' : 'Cambios aplicados.');
+      setTimeout(() => setFlash(''), 4000);
+    } else {
+      setFlash('');
+      setError('No se pudo guardar.');
     }
     setSaving(false);
   };
@@ -102,6 +110,7 @@ export default function DietView({ user }: { user: any }) {
       </h1>
 
       {error && <div className="mt-4 text-sm bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-3">{error}</div>}
+      {flash && <div className="mt-4 text-sm bg-lime-400/15 border border-lime-400/40 text-lime-300 rounded-xl p-3">{flash}</div>}
 
       <div className="flex gap-1 bg-neutral-900 rounded-xl p-1 my-5">
         {(['hoy', 'semana', 'lista', 'ajuste'] as const).map((id) => (
@@ -178,7 +187,7 @@ export default function DietView({ user }: { user: any }) {
       {tab === 'ajuste' && profile && (
         <section className="space-y-4">
           {goals.map((g) => (
-            <button key={g.id} onClick={() => saveProfile({ goal: g.id })}
+            <button key={g.id} disabled={saving} onClick={() => saveProfile({ goal: g.id })}
               className={`text-left w-full rounded-xl p-3 border ${profile.goal === g.id ? 'border-lime-400 bg-lime-400/10' : 'border-neutral-800 bg-neutral-900'}`}>
               <p className="font-semibold">{g.name}</p>
               <p className="text-xs text-neutral-400 mt-1">{g.summary}</p>
@@ -192,7 +201,7 @@ export default function DietView({ user }: { user: any }) {
               { n: 4, title: '4 tomas', desc: 'Lo mismo + un snack entre horas.' },
               { n: 5, title: '5 tomas', desc: 'Snack + algo peri-entreno los días A/B/C.' },
             ].map((opt) => (
-              <button key={opt.n} onClick={() => saveProfile({ meals_per_day: opt.n })}
+              <button key={opt.n} disabled={saving} onClick={() => saveProfile({ meals_per_day: opt.n })}
                 className={`text-left w-full rounded-xl p-3 border mb-2 ${Number(profile.meals_per_day) === opt.n ? 'border-lime-400 bg-lime-400/10' : 'border-neutral-800 bg-neutral-900'}`}>
                 <p className="font-semibold">{opt.title}</p>
                 <p className="text-xs text-neutral-400 mt-1">{opt.desc}</p>
@@ -202,9 +211,12 @@ export default function DietView({ user }: { user: any }) {
           <input type="number" defaultValue={profile.weight_kg || ''} placeholder="Peso kg"
             className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3"
             onBlur={(e) => { if (e.target.value) saveProfile({ weight_kg: Number(e.target.value) }); }} />
-          <button disabled={saving} onClick={() => saveProfile({})}
-            className="w-full flex items-center justify-center gap-2 bg-lime-400 text-neutral-950 font-bold rounded-xl py-3">
-            <RefreshCw size={16} /> Regenerar semana
+          <button disabled={saving} onClick={() => saveProfile({}, true)}
+            className={`w-full flex items-center justify-center gap-2 font-bold rounded-xl py-3 ${
+              saving ? 'bg-lime-400/60 text-neutral-950' : 'bg-lime-400 text-neutral-950'
+            }`}>
+            <RefreshCw size={16} className={saving ? 'animate-spin' : ''} />
+            {saving ? 'Generando menú…' : 'Regenerar semana'}
           </button>
         </section>
       )}
