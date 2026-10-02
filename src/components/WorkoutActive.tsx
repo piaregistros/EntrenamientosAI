@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Dumbbell, Timer, ArrowRight, ArrowLeft, Plus, Check, Trash2, RefreshCw, XCircle, ChevronRight, CheckCircle2, AlertTriangle, Loader, Volume2, Info } from 'lucide-react';
+import { Play, Dumbbell, Timer, ArrowRight, ArrowLeft, Plus, Check, Trash2, RefreshCw, XCircle, ChevronRight, CheckCircle2, AlertTriangle, Loader, Volume2, Info, MessageCircle } from 'lucide-react';
+// share icons added below if missing
+
 import { motion, AnimatePresence } from 'motion/react';
 import { Exercise, Routine, RoutineExercise, WorkoutLog, WorkoutSet, ExerciseSubstitution } from '../types';
 import { apiFetch } from '../lib/api';
@@ -49,8 +51,12 @@ export default function WorkoutActive({
 
   // Modals & panels
   const [showFinishModal, setShowFinishModal] = useState(false);
+  const [workoutCompleted, setWorkoutCompleted] = useState(false);
   const [finishNotes, setFinishNotes] = useState('');
   const [showSubModal, setShowSubModal] = useState(false);
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [showAddExtra, setShowAddExtra] = useState(false);
+  const [extraId, setExtraId] = useState('');
   const [availableSubs, setAvailableSubs] = useState<any[]>([]);
   const [subReason, setSubReason] = useState('No disponible');
   const [substitutionsMap, setSubstitutionsMap] = useState<Record<string, RoutineExercise>>({});
@@ -64,6 +70,8 @@ export default function WorkoutActive({
 
   // Sound play helper simulation
   const audioContextRef = useRef<AudioContext | null>(null);
+  const workoutStartMsRef = useRef<number | null>(null);
+  const restEndsAtMsRef = useRef<number | null>(null);
 
   const playTimerDoneSound = () => {
     try {
@@ -91,27 +99,79 @@ export default function WorkoutActive({
     startWorkoutSession();
   }, [routineId, existingWorkoutId]);
 
-  // Main session stopwatch
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsedSeconds(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const syncElapsedFromClock = () => {
+    const start = workoutStartMsRef.current;
+    if (!start) return;
+    setElapsedSeconds(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+  };
 
-  // Rest timer countdown
-  useEffect(() => {
-    if (restSecondsLeft === null) return;
-    if (restSecondsLeft <= 0) {
-      playTimerDoneSound();
+  const syncRestFromClock = () => {
+    const ends = restEndsAtMsRef.current;
+    if (ends == null) return;
+    const left = Math.ceil((ends - Date.now()) / 1000);
+    if (left <= 0) {
+      restEndsAtMsRef.current = null;
+      try { sessionStorage.removeItem('entreno-rest-ends'); } catch {}
       setRestSecondsLeft(null);
-      return;
+      playTimerDoneSound();
+    } else {
+      setRestSecondsLeft(left);
     }
-    const timer = setTimeout(() => {
-      setRestSecondsLeft(restSecondsLeft - 1);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [restSecondsLeft]);
+  };
+
+  const beginRest = (seconds: number) => {
+    if (!seconds || seconds <= 0) return;
+    setTotalRestDuration(seconds);
+    const ends = Date.now() + seconds * 1000;
+    restEndsAtMsRef.current = ends;
+    try { sessionStorage.setItem('entreno-rest-ends', String(ends)); } catch {}
+    setRestSecondsLeft(seconds);
+  };
+
+  const addRestSeconds = (extra: number) => {
+    const currentEnds = restEndsAtMsRef.current ?? (Date.now() + (restSecondsLeft || 0) * 1000);
+    const ends = currentEnds + extra * 1000;
+    restEndsAtMsRef.current = ends;
+    try { sessionStorage.setItem('entreno-rest-ends', String(ends)); } catch {}
+    setRestSecondsLeft(Math.max(0, Math.ceil((ends - Date.now()) / 1000)));
+  };
+
+  const clearRest = () => {
+    restEndsAtMsRef.current = null;
+    try { sessionStorage.removeItem('entreno-rest-ends'); } catch {}
+    setRestSecondsLeft(null);
+  };
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('entreno-rest-ends');
+      if (saved) {
+        const ends = Number(saved);
+        if (ends > Date.now()) {
+          restEndsAtMsRef.current = ends;
+          setRestSecondsLeft(Math.ceil((ends - Date.now()) / 1000));
+        } else {
+          sessionStorage.removeItem('entreno-rest-ends');
+        }
+      }
+    } catch {}
+    const tick = () => {
+      syncElapsedFromClock();
+      syncRestFromClock();
+    };
+    tick();
+    const interval = setInterval(tick, 250);
+    const onVis = () => { if (document.visibilityState === 'visible') tick(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', tick);
+    window.addEventListener('pageshow', tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', tick);
+      window.removeEventListener('pageshow', tick);
+    };
+  }, []);
 
   const startWorkoutSession = async () => {
     setLoading(true);
@@ -174,9 +234,12 @@ export default function WorkoutActive({
       if (startData.date) {
         const startedAt = new Date(startData.date).getTime();
         if (!Number.isNaN(startedAt)) {
+          workoutStartMsRef.current = startedAt;
           setElapsedSeconds(
             Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
           );
+        } else {
+          workoutStartMsRef.current = Date.now();
         }
       }
 
@@ -294,6 +357,54 @@ export default function WorkoutActive({
     }
   };
 
+  const loadCatalog = async () => {
+    if (catalog.length) {
+      setShowAddExtra(true);
+      return;
+    }
+    try {
+      const res = await apiFetch('/api/exercises');
+      const data = await res.json();
+      const list = Array.isArray(data?.exercises) ? data.exercises : Array.isArray(data) ? data : [];
+      setCatalog(list.filter((e: any) => e.is_active !== false && e.is_active !== 0));
+      setShowAddExtra(true);
+    } catch {
+      setError('No se pudo cargar el catálogo.');
+    }
+  };
+
+  const addExtraExercise = () => {
+    const ex = catalog.find((e) => e.id === extraId);
+    if (!ex) {
+      setError('Elige un ejercicio.');
+      return;
+    }
+    const already = exercises.findIndex((re) => re.exercise?.id === ex.id || re.exercise_id === ex.id);
+    if (already >= 0) {
+      selectExercise(already);
+      setShowAddExtra(false);
+      return;
+    }
+    const item = {
+      id: 'extra-' + ex.id,
+      exercise_id: ex.id,
+      order: exercises.length + 1,
+      target_sets: 3,
+      target_rep_min: 8,
+      target_rep_max: 12,
+      target_rir: 2,
+      rest_seconds: 90,
+      is_optional: true,
+      exercise: ex,
+    };
+    const next = [...exercises, item];
+    setExercises(next);
+    setActiveExIndex(next.length - 1);
+    setShowAddExtra(false);
+    setError(null);
+    void persistCurrentExercise(ex.id);
+  };
+
   const selectExercise = (index: number) => {
     if (index < 0 || index >= exercises.length) return;
 
@@ -395,7 +506,7 @@ export default function WorkoutActive({
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo guardar la serie');
+      if (!res.ok) throw new Error(data.detail || data.error || 'No se pudo guardar la serie');
 
       // Update logged sets locally
       setLoggedSets([...loggedSets, data]);
@@ -403,8 +514,7 @@ export default function WorkoutActive({
 
       // Trigger Rest Timer automatically
       if (activeExerciseItem.rest_seconds > 0) {
-        setTotalRestDuration(activeExerciseItem.rest_seconds);
-        setRestSecondsLeft(activeExerciseItem.rest_seconds);
+        beginRest(activeExerciseItem.rest_seconds);
       }
     } catch (err: any) {
       setError(err.message || 'Error al guardar la serie.');
@@ -458,7 +568,8 @@ export default function WorkoutActive({
         throw new Error(data.error || 'No se pudo finalizar el entrenamiento');
       }
 
-      onWorkoutFinished();
+      setShowFinishModal(false);
+      setWorkoutCompleted(true);
     } catch (err: any) {
       setError(err.message || 'Error al guardar entrenamiento.');
       setShowFinishModal(false);
@@ -505,7 +616,8 @@ export default function WorkoutActive({
       const res = await apiFetch(`/api/exercises/${activeExercise.id}/substitutions?user_id=${encodeURIComponent(user.id)}`);
       if (!res.ok) throw new Error('No se encontraron alternativas.');
       const data = await res.json();
-      setAvailableSubs(data);
+      const list = Array.isArray(data) ? data : (data.substitutions || []);
+      setAvailableSubs(list);
     } catch (err: any) {
       setError(err.message || 'Error al cargar sustituciones.');
     }
@@ -558,6 +670,9 @@ export default function WorkoutActive({
       });
 
       setShowSubModal(false);
+      if (data.substitute_exercise?.id) {
+        void persistCurrentExercise(data.substitute_exercise.id);
+      }
     } catch (err: any) {
       setError(err.message || 'No se pudo realizar la sustitución.');
     } finally {
@@ -659,7 +774,35 @@ export default function WorkoutActive({
                 </button>
               );
             })}
+            <button
+              id="btn-add-extra-exercise"
+              type="button"
+              onClick={() => void loadCatalog()}
+              className="snap-center shrink-0 px-4 py-3 rounded-xl border border-dashed border-lime-400/60 text-lime-400 text-xs font-bold"
+            >
+              + Ejercicio
+            </button>
           </div>
+          {showAddExtra && (
+            <div className="flex gap-2 mt-2">
+              <select
+                value={extraId}
+                onChange={(e) => setExtraId(e.target.value)}
+                className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white"
+              >
+                <option value="">Elige ejercicio…</option>
+                {catalog
+                  .slice()
+                  .sort((a, b) => String(a.name).localeCompare(String(b.name), 'es'))
+                  .map((e) => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+              </select>
+              <button type="button" onClick={addExtraExercise} className="bg-lime-400 text-black font-extrabold text-xs px-3 rounded-xl">
+                Añadir
+              </button>
+            </div>
+          )}
         </div>
 
         {error && (
@@ -1069,7 +1212,7 @@ export default function WorkoutActive({
             <div className="flex items-center gap-2">
               <button
                 id="btn-timer-add-30"
-                onClick={() => setRestSecondsLeft(prev => (prev || 0) + 30)}
+                onClick={() => addRestSeconds(30)}
                 className="bg-black/10 hover:bg-black/15 font-bold px-2.5 py-1.5 rounded-lg text-[10px]"
                 style={{ minHeight: '30px' }}
               >
@@ -1077,7 +1220,7 @@ export default function WorkoutActive({
               </button>
               <button
                 id="btn-timer-skip"
-                onClick={() => setRestSecondsLeft(null)}
+                onClick={() => clearRest()}
                 className="bg-black text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px]"
                 style={{ minHeight: '30px' }}
               >
@@ -1131,13 +1274,13 @@ export default function WorkoutActive({
               {availableSubs.length > 0 ? (
                 <div className="space-y-2.5">
                   {availableSubs.map((sub: any) => {
-                    const alt = sub.alternative_exercise;
+                    const alt = sub.alternative_exercise || { id: sub.exercise_id, name: sub.name };
                     return (
                       <div
                         key={sub.id}
                         id={`sub-item-${alt.id}`}
                         className="bg-neutral-950/60 border border-neutral-800/80 hover:border-neutral-700/80 p-4 rounded-xl flex justify-between items-center transition-all cursor-pointer group"
-                        onClick={() => handleSelectSubstitution(alt.id)}
+                        onClick={() => handleSelectSubstitution(alt?.id || sub.exercise_id || sub.alternative_exercise_id)}
                       >
                         <div className="space-y-1 pr-4">
                           <p className="text-xs font-extrabold text-white group-hover:text-lime-400 transition-colors">{alt.name}</p>
@@ -1172,6 +1315,45 @@ export default function WorkoutActive({
       )}
 
       {/* Finish Workout Notes Modal */}
+      {workoutCompleted && (
+        <div id="workout-completed-summary" className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-4">
+          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-4">
+            <h3 className="text-lg font-black text-white">Sesión terminada</h3>
+            <p className="text-sm text-neutral-400">{formatTime(elapsedSeconds)} · {loggedSets.filter(s => !s.is_warmup).length} series</p>
+            <button
+              type="button"
+              onClick={() => {
+                const byEx = new Map<string, typeof loggedSets>();
+                loggedSets.forEach((s) => {
+                  const k = s.exercise_name || s.exercise_id;
+                  byEx.set(k, [...(byEx.get(k) || []), s]);
+                });
+                const lines = ["ENTRENAMIENTO COMPLETADO", "", ...Array.from(byEx.entries()).map(([n, xs]) => `• ${n}: ${xs.filter(s=>!s.is_warmup).map(s=>`${s.weight_kg}kg x ${s.reps}`).join(" · ")}`)];
+                const text = lines.join("\n");
+                const encoded = encodeURIComponent(text);
+                if (navigator.share) {
+                  navigator.share({ title: "Entrenamiento", text }).catch(() => {
+                    window.location.href = "whatsapp://send?text=" + encoded;
+                  });
+                } else {
+                  window.location.href = "whatsapp://send?text=" + encoded;
+                }
+              }}
+              className="w-full bg-[#25D366] text-white font-extrabold py-3 rounded-xl text-sm flex items-center justify-center gap-2"
+            >
+              <MessageCircle size={18} /> Compartir por WhatsApp
+            </button>
+            <button
+              type="button"
+              onClick={() => onWorkoutFinished()}
+              className="w-full border border-neutral-700 text-neutral-300 font-bold py-3 rounded-xl text-sm"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
+
       {showFinishModal && (
         <div id="finish-workout-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <motion.div

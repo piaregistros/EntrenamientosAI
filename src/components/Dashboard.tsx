@@ -3,6 +3,7 @@ import { Play, Dumbbell, Scale, TrendingUp, Calendar, CheckCircle2, ChevronRight
 import { motion } from 'motion/react';
 import { Routine, WorkoutLog, BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
+import ActivitiesPanel from './ActivitiesPanel';
 
 interface DashboardProps {
   user: any;
@@ -407,6 +408,8 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
           ))}
         </div>
       </div>
+
+      <ActivitiesPanel />
 
       {/* Last Session Review Widget */}
       {lastWorkout && (

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Lock, Trash2, KeyRound, Loader, AlertCircle, CheckCircle2, LogOut, Scale, Plus } from 'lucide-react';
 import { BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
+import ThemeToggle from './ThemeToggle';
 
 interface ProfileViewProps {
   user: any;
@@ -204,6 +205,8 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
           </span>
         </div>
       </div>
+
+      <ThemeToggle />
 
       {/* Weight History Logging Area */}
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-lg space-y-4">
