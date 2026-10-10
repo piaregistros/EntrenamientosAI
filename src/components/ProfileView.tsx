@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Lock, Trash2, KeyRound, Loader, AlertCircle, CheckCircle2, LogOut, Scale, Plus } from 'lucide-react';
+import { User, Lock, Trash2, KeyRound, Loader, AlertCircle, CheckCircle2, LogOut, Scale, Plus, Search } from 'lucide-react';
 import { BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
 import ThemeToggle from './ThemeToggle';
@@ -23,6 +23,59 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
   // Loading / State
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [submittingPassword, setSubmittingPassword] = useState(false);
+
+  const [adminUsers, setAdminUsers] = useState<{id:string;name:string;role:string}[]>([]);
+  const loadUsers = async () => {
+    const res = await apiFetch('/api/auth/admin/users');
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) setAdminUsers(data.users || []);
+  };
+  useEffect(() => { if (user?.role === 'admin') loadUsers(); }, []);
+  const setUserRole = async (u: {id:string;role:string}) => {
+    const res = await apiFetch('/api/auth/admin/users/' + u.id, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: u.role === 'admin' ? 'user' : 'admin' }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setUserMsg(data.detail || 'No se pudo cambiar el rol'); return; }
+    setUserMsg('');
+    loadUsers();
+  };
+  const resetUserPass = async (u: {id:string;name:string}) => {
+    const password = window.prompt('Nueva clave para ' + u.name);
+    if (!password) return;
+    const res = await apiFetch('/api/auth/admin/users/' + u.id, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setUserMsg(res.ok ? 'Clave actualizada' : (data.detail || 'No se pudo cambiar la clave'));
+  };
+  const deleteUser = async (u: {id:string;name:string}) => {
+    if (!window.confirm('¿Borrar a ' + u.name + '? Se borra también su historial.')) return;
+    const res = await apiFetch('/api/auth/admin/users/' + u.id, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setUserMsg(data.detail || 'No se pudo borrar'); return; }
+    setUserMsg('Usuario borrado');
+    loadUsers();
+  };
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserPass, setNewUserPass] = useState('');
+  const [userMsg, setUserMsg] = useState('');
+  const createUser = async () => {
+    setUserMsg('');
+    const res = await apiFetch('/api/auth/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newUserName.trim(), password: newUserPass }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setUserMsg(data.detail || 'No se pudo crear'); return; }
+    setUserMsg('Creado: ' + data.name);
+    loadUsers();
+    setNewUserName(''); setNewUserPass('');
+  };
+
   const [submittingWeight, setSubmittingWeight] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -158,6 +211,53 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
     }
   };
 
+  const [newExName, setNewExName] = useState('');
+  const [draft, setDraft] = useState<any>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draftMsg, setDraftMsg] = useState('');
+
+  const searchExercise = async () => {
+    setDraftBusy(true);
+    setDraftMsg('');
+    setDraft(null);
+    try {
+      const res = await apiFetch('/api/exercises/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newExName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No se pudo buscar');
+      setDraft(data);
+    } catch (err: any) {
+      setDraftMsg(err.message || 'Error de búsqueda');
+    } finally {
+      setDraftBusy(false);
+    }
+  };
+
+  const saveExercise = async () => {
+    if (!draft) return;
+    setDraftBusy(true);
+    setDraftMsg('');
+    try {
+      const res = await apiFetch('/api/exercises', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No se pudo guardar');
+      setDraftMsg('Guardado: ' + data.name);
+      setDraft(null);
+      setNewExName('');
+    } catch (err: any) {
+      setDraftMsg(err.message || 'Error al guardar');
+    } finally {
+      setDraftBusy(false);
+    }
+  };
+
   return (
     <div id="profile-panel-container" className="min-h-screen bg-neutral-950 text-neutral-100 pb-24 px-4 pt-6 max-w-md mx-auto select-none space-y-6">
       
@@ -206,7 +306,60 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
         </div>
       </div>
 
+      
+      {user.role === 'admin' && (
+        <div id="admin-new-user" className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-3">
+          <h3 className="text-sm font-extrabold text-white">Nuevo usuario</h3>
+          <p className="text-[11px] text-neutral-500">Le pones una clave. Al entrar la cambia y hace el test.</p>
+          <input value={newUserName} onChange={(e) => setNewUserName(e.target.value)} placeholder="Nombre" className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white" />
+          <input value={newUserPass} onChange={(e) => setNewUserPass(e.target.value)} placeholder="Contraseña inicial" type="text" className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white" />
+          <button type="button" onClick={createUser} className="w-full bg-lime-400 text-black font-extrabold rounded-xl py-2.5 text-sm">Crear usuario</button>
+          
+          <div id="admin-user-list" className="space-y-2 pt-1">
+            {adminUsers.map((u) => (
+              <div key={u.id} className="flex items-center gap-2 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white truncate">{u.name}</p>
+                  <p className="text-[10px] uppercase text-neutral-500">{u.role}</p>
+                </div>
+                {u.id !== user.id && (
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => setUserRole(u)} className="text-[11px] text-neutral-200 border border-neutral-700 rounded-lg px-2 py-1">{u.role === 'admin' ? 'Quitar admin' : 'Hacer admin'}</button>
+                    <button type="button" onClick={() => resetUserPass(u)} className="text-[11px] text-neutral-200 border border-neutral-700 rounded-lg px-2 py-1">Clave</button>
+                    <button type="button" onClick={() => deleteUser(u)} className="text-[11px] text-red-400 border border-red-900 rounded-lg px-2 py-1">Borrar</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {userMsg && <p className="text-xs text-lime-400">{userMsg}</p>}
+        </div>
+      )}
+
       <ThemeToggle />
+      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-3">
+        <h3 className="text-sm font-extrabold text-white">Nuevo ejercicio</h3>
+        <p className="text-[11px] text-neutral-500">Escribe el nombre. Se busca online y se rellena la ficha. Revísala antes de guardar.</p>
+        <div className="flex gap-2">
+          <input value={newExName} onChange={(e) => setNewExName(e.target.value)} placeholder="Nombre, ej. Pájaros en polea" className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white" />
+          <button type="button" disabled={draftBusy || newExName.trim().length < 2} onClick={searchExercise} className="bg-lime-400 text-black font-extrabold text-xs px-3 rounded-xl flex items-center gap-1 disabled:opacity-50">
+            <Search size={14} /> Buscar
+          </button>
+        </div>
+        {draftMsg && <p className="text-xs text-lime-400">{draftMsg}</p>}
+        {draft && (
+          <div className="space-y-2 text-xs">
+            <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2 py-2 text-white" />
+            <input value={draft.target_muscle} onChange={(e) => setDraft({ ...draft, target_muscle: e.target.value })} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2 py-2 text-white" />
+            <input value={draft.equipment} onChange={(e) => setDraft({ ...draft, equipment: e.target.value })} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2 py-2 text-white" />
+            <textarea value={draft.instructions} onChange={(e) => setDraft({ ...draft, instructions: e.target.value })} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2 py-2 text-white h-24" />
+            <p className="text-neutral-500">Pasos: {(draft.steps || []).join(' · ')}</p>
+            {draft.source && <p className="text-neutral-600">Fuente: {draft.source}</p>}
+            <button type="button" disabled={draftBusy} onClick={saveExercise} className="w-full bg-lime-400 text-black font-extrabold py-2 rounded-xl">Guardar en el catálogo</button>
+          </div>
+        )}
+      </div>
 
       {/* Weight History Logging Area */}
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-lg space-y-4">

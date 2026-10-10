@@ -43,6 +43,7 @@ export default function WorkoutActive({
   const [totalRestDuration, setTotalRestDuration] = useState<number>(0);
 
   // Form states for adding sets
+  const lastWeightByExercise = React.useRef<Record<string, string>>({});
   const [inputWeight, setInputWeight] = useState<string>('');
   const [inputReps, setInputReps] = useState<string>('');
   const [inputRir, setInputRir] = useState<string>('2');
@@ -205,7 +206,8 @@ export default function WorkoutActive({
         });
 
         if (!startRes.ok) {
-          throw new Error('No se pudo inicializar el entrenamiento');
+          const fail = await startRes.json().catch(() => ({}));
+          throw new Error(fail.detail || fail.error || 'No se pudo inicializar el entrenamiento');
         }
 
         startData = await startRes.json();
@@ -417,6 +419,25 @@ export default function WorkoutActive({
     }
   };
 
+  const exerciseIcon = (name?: string, _muscle?: string) => {
+  const n = (name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const go = (f: string) => '/icons4/' + f + '?v=1';
+  if (n.includes('plancha') || n.includes('crunch') || n.includes('rodilla') || n.includes('pallof')) return go('plancha.jpg');
+  if (n.includes('prensa')) return go('prensa.jpg');
+  if (n.includes('femoral') || n.includes('peso muerto') || n.includes('hip') || n.includes('patada') || n.includes('abduc') || n.includes('cadera')) return go('hip.jpg');
+  if (n.includes('jalon') || n.includes('estirar') || n.includes('pullover')) return go('jalon.jpg');
+  if (n.includes('remo')) return go('remo.jpg');
+  if (n.includes('lateral')) return go('lateral.jpg');
+  if (n.includes('gemelo')) return go('gemelo.jpg');
+  if (n.includes('tricep') || n.includes('frances')) return go('triceps.jpg');
+  if (n.includes('curl') || n.includes('bicep') || n.includes('martillo')) return go('curl.jpg');
+  if (n.includes('hombro') || n.includes('militar') || n.includes('pajaro') || n.includes('face')) return go('hombro.jpg');
+  if (n.includes('banca') || n.includes('apertura') || n.includes('cruce') || n.includes('convergente') || (n.includes('inclinado') && !n.includes('curl'))) return go('banca.jpg');
+  if (n.includes('sentadilla') || n.includes('zancada') || n.includes('hack') || n.includes('goblet') || n.includes('step')) return go('sentadilla.jpg');
+  if (n.includes('cuadricep')) return go('sentadilla.jpg');
+  return go('prensa.jpg');
+};
+
   const activeExerciseItem = exercises[activeExIndex];
   const activeExercise = activeExerciseItem?.exercise;
 
@@ -428,7 +449,21 @@ export default function WorkoutActive({
     const rec = recommendations.find(r => r.exercise_id === activeExercise.id);
     const lastPerf = activeExerciseItem.last_performance;
 
-    if (rec) {
+    let stored = {};
+    try { stored = JSON.parse(localStorage.getItem('entreno-next-loads') || '{}'); } catch { stored = {}; }
+    const planned = stored[activeExercise.id];
+    const deload = localStorage.getItem('entreno-deload') === '1';
+    const remembered = lastWeightByExercise.current[String(activeExercise?.id || '')];
+    if (remembered && !isTimedExercise(activeExerciseItem)) {
+      setInputWeight(remembered);
+      return;
+    }
+    if (planned && planned.next_weight_kg != null && !isTimedExercise(activeExerciseItem)) {
+      const w = deload ? Math.round(planned.next_weight_kg * 0.9 / 2.5) * 2.5 : planned.next_weight_kg;
+      setInputWeight(String(w));
+      setInputReps(String(activeExerciseItem.target_rep_min || 8));
+      setError(planned.reason || null);
+    } else if (rec) {
       // El backend usa recommended_rep_target.
       // recommended_weight_kg puede ser null cuando no existe histórico.
       const recommendedWeight = rec.recommended_weight_kg;
@@ -559,7 +594,7 @@ export default function WorkoutActive({
           status: 'completed',
           duration_minutes: Math.max(1, Math.round(elapsedSeconds / 60)),
           notes: finishNotes,
-          current_exercise_id: workoutLog.current_exercise_id ?? null,
+          current_exercise_id: workoutLog.current_exercise_id ?? null, is_deload: localStorage.getItem('entreno-deload') === '1' ? 1 : 0,
         })
       });
 
@@ -762,7 +797,7 @@ export default function WorkoutActive({
                   style={{ minWidth: '100px' }}
                 >
                   <span className="opacity-60">{idx + 1}.</span>
-                  <span className="truncate max-w-[110px]">{re.exercise?.name}</span>
+                  <span className="truncate max-w-[110px] flex items-center gap-1"><img src={exerciseIcon(re.exercise?.name, re.exercise?.target_muscle)} alt="" className="w-6 h-6 rounded object-cover bg-white" />{re.exercise?.name}</span>
                   {setsCount > 0 && (
                     <span className="bg-lime-500 text-black w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold">
                       {setsCount}
@@ -819,7 +854,7 @@ export default function WorkoutActive({
               <div>
                 <span className="text-[10px] font-bold text-lime-400 uppercase tracking-widest">{activeExercise.target_muscle}</span>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <h3 id="active-exercise-name" className="text-xl font-extrabold text-white leading-tight">{activeExercise.name}</h3>
+                  <img src={exerciseIcon(activeExercise?.name, activeExercise?.target_muscle)} alt="" className="w-12 h-12 rounded-xl object-cover bg-white mr-2" /><h3 id="active-exercise-name" className="text-xl font-extrabold text-white leading-tight">{activeExercise.name}</h3>
                   {onOpenExerciseInfo && (
                     <button
                       onClick={() => onOpenExerciseInfo(activeExercise)}
@@ -833,7 +868,16 @@ export default function WorkoutActive({
                 <p className="text-[10px] text-neutral-500 mt-1 uppercase font-semibold">{activeExercise.equipment} · RIR {activeExerciseItem.target_rir} recomendado</p>
               </div>
               <button
-                id="btn-substitute-trigger"
+                id="btn-flag-discomfort" onClick={async () => {
+                  const zone = window.prompt('Zona (hombro, lumbar, rodilla, codo, otro)', 'hombro');
+                  if (!zone || !activeExercise) return;
+                  await apiFetch('/api/progress/flag?user_id=' + encodeURIComponent(user.id), {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ exercise_id: activeExercise.id, zone, note: '' }),
+                  });
+                  setError('Aviso guardado: ' + zone);
+                }} className="bg-neutral-800 text-orange-300 font-bold px-3 py-1.5 rounded-xl text-[10px] border border-neutral-700/50">Molestia</button>
+              <button id="btn-substitute-trigger"
                 onClick={handleOpenSubstitutions}
                 className="bg-neutral-800 hover:bg-neutral-700 text-yellow-400 font-bold px-3 py-1.5 rounded-xl text-[10px] flex items-center gap-1 transition-all border border-neutral-700/50 active:scale-95"
                 style={{ minHeight: '32px' }}
@@ -928,13 +972,15 @@ export default function WorkoutActive({
                     >
                       -
                     </button>
-                    <input
+                    
+                      
+<input
                       id="input-weight"
                       type="number"
                       step="0.1"
                       placeholder="0"
                       value={inputWeight}
-                      onChange={(e) => setInputWeight(e.target.value)}
+                      onChange={(e) => { setInputWeight(e.target.value); if (activeExercise?.id) lastWeightByExercise.current[String(activeExercise.id)] = e.target.value; }}
                       className="w-full bg-transparent text-center font-mono font-bold text-white text-sm focus:outline-none"
                     />
                     <button
@@ -1042,9 +1088,32 @@ export default function WorkoutActive({
             </div>
 
             <div className="space-y-2">
+{!isTimedExercise(activeExerciseItem) && (
+              <div className="mt-2 space-y-1">
+                <p className="text-xs font-bold text-lime-400">
+                  {(() => {
+                    const side = Math.max(0, (parseFloat(inputWeight) || 0) - 20) / 2;
+                    const plates = [25, 20, 15, 10, 5, 2.5, 1.25];
+                    let left = side; const used: string[] = [];
+                    for (const pl of plates) {
+                      const n = Math.floor(left / pl + 1e-6);
+                      if (n) { used.push(n + '×' + pl); left = Math.round((left - n * pl) * 100) / 100; }
+                    }
+                    return 'Discos: ' + (used.length ? used.join(' + ') + ' por lado' : 'solo barra');
+                  })()}
+                </p>
+                <button type="button" className="text-xs font-bold text-lime-300 underline" onClick={() => { setInputWeight(String(Math.round(((parseFloat(inputWeight) || 0) * 0.5) / 2.5) * 2.5)); setIsWarmup(true); }}>
+                  Calentamiento 50%
+                </button>
+              </div>
+            )}
               <input
                 id="input-set-note"
                 type="text"
+
+            
+
+
                 placeholder="Notas de esta serie (ej: Molestia hombro, fácil...)"
                 value={setNote}
                 onChange={(e) => setSetNote(e.target.value)}

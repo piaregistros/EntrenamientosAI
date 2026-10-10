@@ -3,6 +3,7 @@ import { Play, Dumbbell, Scale, TrendingUp, Calendar, CheckCircle2, ChevronRight
 import { motion } from 'motion/react';
 import { Routine, WorkoutLog, BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
+import HomeProgress from './HomeProgress';
 import ActivitiesPanel from './ActivitiesPanel';
 
 interface DashboardProps {
@@ -353,42 +354,7 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
         </div>
       )}
 
-      {/* Recommended Routine Card */}
-      {recommendedRoutine && (
-        <div id="recommended-routine-card" className="bg-gradient-to-br from-neutral-900 to-neutral-950 border border-neutral-800 rounded-2xl p-5 relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-lime-500/5 blur-2xl pointer-events-none" />
-          <div className="flex justify-between items-start">
-            <div>
-              <span className="text-[10px] bg-lime-400/10 text-lime-400 font-extrabold uppercase px-2.5 py-1 rounded-md tracking-wider border border-lime-400/20">Siguiente Entrenamiento</span>
-              <h3 id="recommended-routine-title" className="text-xl font-extrabold text-white mt-3">{recommendedRoutine.name}</h3>
-              <p className="text-xs text-neutral-400 mt-1">Personalizado para progresión de fuerza e hipertrofia.</p>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center text-lime-400">
-              <Dumbbell size={18} />
-            </div>
-          </div>
-
-          <div className="mt-5 pt-4 border-t border-neutral-800/60 flex items-center justify-between">
-            <button
-              id="btn-preview-routine"
-              onClick={() => setSelectedRoutineForPreview(recommendedRoutine)}
-              className="text-xs font-bold text-neutral-400 hover:text-white flex items-center gap-1.5"
-            >
-              <Info size={14} />
-              <span>Ver Ejercicios</span>
-            </button>
-            <button
-              id="btn-start-recommended-workout"
-              onClick={() => onStartWorkout(recommendedRoutine.id)}
-              className="bg-lime-400 text-black font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 hover:bg-lime-300 transition-all active:scale-95 shadow-lg shadow-lime-500/5"
-              style={{ minHeight: '44px' }}
-            >
-              <Play size={12} fill="currentColor" />
-              <span>Empezar</span>
-            </button>
-          </div>
-        </div>
-      )}
+      {user?.id && <HomeProgress userId={user.id} onStart={onStartWorkout} />}
 
       {/* Routine list switcher */}
       <div className="space-y-3">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dumbbell, Lock, Mail, AlertCircle, Loader } from 'lucide-react';
+import { Dumbbell, Lock, Mail, AlertCircle, Loader, Fingerprint } from 'lucide-react';
 import { motion } from 'motion/react';
 import { apiFetch } from '../lib/api';
 
@@ -12,6 +12,14 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savedUser, setSavedUser] = useState('');
+  React.useEffect(() => {
+    try { setSavedUser(localStorage.getItem('entreno-last-user') || ''); } catch {}
+  }, []);
+  const [huellaUsers, setHuellaUsers] = useState<string[]>([]);
+  React.useEffect(() => {
+    apiFetch('/api/auth/webauthn/users').then(r => r.json()).then(d => setHuellaUsers(d.users || [])).catch(() => {});
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,9 +51,76 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       }
 
       // Save user profile state
+      try { const n = (data && data.name) || (typeof name === 'string' ? name : emailOrName.trim()); if (n) localStorage.setItem('entreno-last-user', n); } catch {}
       onLoginSuccess(data);
     } catch (err: any) {
       setError(err.message || 'Error al conectar con el servidor.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  function b64ToBuf(b64: string) {
+    const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+    const s = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(s);
+    return Uint8Array.from(bin, (c) => c.charCodeAt(0)).buffer;
+  }
+  function bufToB64(buf: ArrayBuffer) {
+    const bytes = new Uint8Array(buf);
+    let s = '';
+    for (const b of bytes) s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  const handleFingerprint = async (who?: string) => {
+    const name = (typeof who === 'string' ? who : emailOrName).trim();
+    if (!name) {
+      setError('Elige un usuario.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const optRes = await apiFetch('/api/auth/webauthn/login/options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const options = await optRes.json();
+      if (!optRes.ok) throw new Error(options.detail || 'No hay huella para este usuario');
+      const publicKey: any = {
+        ...options,
+        challenge: b64ToBuf(options.challenge),
+        allowCredentials: (options.allowCredentials || []).map((c: any) => ({
+          ...c,
+          id: b64ToBuf(c.id),
+        })),
+      };
+      const cred = await navigator.credentials.get({ publicKey }) as any;
+      if (!cred) throw new Error('Huella cancelada');
+      const credential = {
+        id: cred.id,
+        rawId: bufToB64(cred.rawId),
+        type: cred.type,
+        response: {
+          clientDataJSON: bufToB64(cred.response.clientDataJSON),
+          authenticatorData: bufToB64(cred.response.authenticatorData),
+          signature: bufToB64(cred.response.signature),
+          userHandle: cred.response.userHandle ? bufToB64(cred.response.userHandle) : null,
+        },
+      };
+      const ver = await apiFetch('/api/auth/webauthn/login/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential }),
+      });
+      const data = await ver.json();
+      if (!ver.ok) throw new Error(data.detail || 'Huella no válida');
+      try { const n = (data && data.name) || (typeof name === 'string' ? name : emailOrName.trim()); if (n) localStorage.setItem('entreno-last-user', n); } catch {}
+      onLoginSuccess(data);
+    } catch (err: any) {
+      setError(err.message || 'No se pudo entrar con la huella.');
     } finally {
       setLoading(false);
     }
@@ -71,6 +146,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         throw new Error(data.error || 'Acceso rápido fallido');
       }
 
+      try { const n = (data && data.name) || (typeof name === 'string' ? name : emailOrName.trim()); if (n) localStorage.setItem('entreno-last-user', n); } catch {}
       onLoginSuccess(data);
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión rápida.');
@@ -177,7 +253,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 id="login-submit-btn"
                 type="submit"
                 disabled={loading}
-                className="col-span-2 bg-neutral-800 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition-all hover:bg-neutral-700 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                className="col-span-5 bg-neutral-800 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition-all hover:bg-neutral-700 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ minHeight: '44px' }}
               >
                 {loading ? (
@@ -187,54 +263,35 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 )}
               </button>
 
-              <button
-                id="login-guest-btn"
-                type="button"
-                onClick={() => handleQuickAccess('pablo')}
-                disabled={loading}
-                className="col-span-3 bg-gradient-to-r from-lime-400 to-emerald-500 text-black font-extrabold py-3.5 px-4 rounded-xl text-sm transition-all shadow-lg hover:shadow-lime-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ minHeight: '44px' }}
-              >
-                {loading ? (
-                  <Loader className="animate-spin" size={16} />
-                ) : (
-                  <span>Entrar como Invitado</span>
-                )}
-              </button>
+              
             </div>
+
+            
+            {savedUser && (
+              <button
+                type="button"
+                onClick={() => handleFingerprint(savedUser)}
+                disabled={loading}
+                className="w-full bg-lime-400 text-black font-extrabold py-3.5 rounded-xl text-sm flex items-center justify-center gap-2"
+              >
+                <Fingerprint size={18} />
+                <span>Huella · {savedUser}</span>
+              </button>
+            )}
+
+            <button
+              id="login-fingerprint-btn"
+              type="button"
+              onClick={handleFingerprint}
+              disabled={loading}
+              className="w-full border border-lime-500/40 text-lime-400 font-bold py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-lime-500/10 active:scale-[0.98] disabled:opacity-50"
+            >
+              <Fingerprint size={18} />
+              <span>Entrar con huella</span>
+            </button>
           </form>
 
-          {/* Quick Access Area */}
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-neutral-800"></div>
-            <span className="flex-shrink mx-4 text-neutral-500 text-[10px] font-bold uppercase tracking-wider">Perfiles de Prueba</span>
-            <div className="flex-grow border-t border-neutral-800"></div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              id="quick-login-pablo"
-              type="button"
-              onClick={() => handleQuickAccess('pablo')}
-              disabled={loading}
-              className="flex flex-col items-center justify-center py-3 px-4 bg-neutral-950/40 border border-neutral-800 hover:border-lime-500/40 rounded-xl text-neutral-300 font-bold transition-all hover:bg-neutral-900 active:scale-95 group text-xs"
-              style={{ minHeight: '44px' }}
-            >
-              <span className="text-lime-400 group-hover:scale-110 transition-transform">Pablo</span>
-              <span className="text-[10px] text-neutral-500 font-normal mt-1">Administrador</span>
-            </button>
-            <button
-              id="quick-login-estefi"
-              type="button"
-              onClick={() => handleQuickAccess('estefi')}
-              disabled={loading}
-              className="flex flex-col items-center justify-center py-3 px-4 bg-neutral-950/40 border border-neutral-800 hover:border-lime-500/40 rounded-xl text-neutral-300 font-bold transition-all hover:bg-neutral-900 active:scale-95 group text-xs"
-              style={{ minHeight: '44px' }}
-            >
-              <span className="text-lime-400 group-hover:scale-110 transition-transform">Estefi</span>
-              <span className="text-[10px] text-neutral-500 font-normal mt-1">Usuario</span>
-            </button>
-          </div>
+          
         </motion.div>
       </div>
     </div>

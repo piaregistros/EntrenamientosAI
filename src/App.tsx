@@ -6,12 +6,14 @@ import WorkoutActive from './components/WorkoutActive';
 import HistoryList from './components/HistoryList';
 import StatsView from './components/StatsView';
 import ProfileView from './components/ProfileView';
+import Onboarding from './components/Onboarding/Onboarding';
 import DietView from './components/DietView';
 import ExerciseInfo from './components/ExerciseInfo';
 import { Exercise } from './types';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('home');
   const [activeRoutineId, setActiveRoutineId] = useState<string | null>(null);
   const [activeWorkoutId, setActiveWorkoutId] = useState<string | null>(null);
@@ -55,6 +57,7 @@ export default function App() {
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
+          apiFetch('/api/onboarding').then(r => r.json()).then(d => setNeedsOnboarding(!!d.required)).catch(() => {});
           try {
             const workoutResponse = await fetch('/api/workouts/in-progress', { credentials: 'include' });
             if (workoutResponse.ok) {
@@ -83,7 +86,8 @@ export default function App() {
   if (checkingSession) {
     return <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-lime-400 font-bold">Iniciando...</div>;
   }
-  if (!user) return <Login onLoginSuccess={(u: any) => { setUser(u); setActiveTab('home'); }} />;
+  if (!user) return <Login onLoginSuccess={(u: any) => { setUser(u); setActiveTab('home'); apiFetch('/api/onboarding').then(r => r.json()).then(d => setNeedsOnboarding(!!d.required)).catch(() => {}); }} />;
+  if (needsOnboarding) return <Onboarding user={user} onComplete={() => setNeedsOnboarding(false)} />;
 
   if (activeRoutineId) {
     return (
