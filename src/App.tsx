@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiFetch } from './lib/api';
 import BottomNav from './components/BottomNav';
 import Login from './components/Login';
@@ -21,6 +21,36 @@ export default function App() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [isExerciseInfoOpen, setIsExerciseInfoOpen] = useState(false);
+
+  // Navegación con historial del navegador: cada cambio de pestaña añade una
+  // entrada, de modo que "Atrás" vuelve a la sección anterior en lugar de salir
+  // de la app. Con un entreno activo, "Atrás" no abandona la sesión.
+  const activeTabRef = useRef(activeTab);
+  const workoutActiveRef = useRef(false);
+  activeTabRef.current = activeTab;
+  workoutActiveRef.current = !!activeRoutineId;
+
+  const navigateToTab = (tab: string) => {
+    if (tab !== activeTabRef.current) {
+      window.history.pushState({ tab }, '');
+    }
+    setActiveTab(tab);
+  };
+
+  useEffect(() => {
+    window.history.replaceState({ tab: activeTabRef.current }, '');
+    const onPop = (e: PopStateEvent) => {
+      if (workoutActiveRef.current) {
+        // No salir del entreno con "Atrás": se repone la entrada del historial.
+        window.history.pushState({ tab: activeTabRef.current }, '');
+        return;
+      }
+      const tab = e.state && typeof e.state.tab === 'string' ? e.state.tab : 'home';
+      setActiveTab(tab);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   const handleOpenExerciseInfo = (exercise: Exercise) => {
     const normalizeExerciseName = (value: string) =>
@@ -94,8 +124,8 @@ export default function App() {
     return (
       <div className="bg-neutral-950 min-h-screen">
         <WorkoutActive user={user} routineId={activeRoutineId} existingWorkoutId={activeWorkoutId}
-          onWorkoutFinished={() => { setActiveWorkoutId(null); setActiveRoutineId(null); setActiveTab('history'); }}
-          onWorkoutExit={() => { setActiveWorkoutId(null); setActiveRoutineId(null); setActiveTab('home'); }}
+          onWorkoutFinished={() => { setActiveWorkoutId(null); setActiveRoutineId(null); navigateToTab('history'); }}
+          onWorkoutExit={() => { setActiveWorkoutId(null); setActiveRoutineId(null); navigateToTab('home'); }}
           onOpenExerciseInfo={handleOpenExerciseInfo} />
         <ExerciseInfo exercise={selectedExercise} isOpen={isExerciseInfoOpen} onClose={() => setIsExerciseInfoOpen(false)} />
       </div>
@@ -106,13 +136,13 @@ export default function App() {
     <div className="bg-neutral-950 min-h-screen">
       {activeTab === 'home' && (
         <Dashboard user={user} onStartWorkout={(id) => { setActiveWorkoutId(null); setActiveRoutineId(id); }}
-          onNavigateToTab={(tab) => setActiveTab(tab)} onOpenExerciseInfo={handleOpenExerciseInfo} />
+          onNavigateToTab={(tab) => navigateToTab(tab)} onOpenExerciseInfo={handleOpenExerciseInfo} />
       )}
       {activeTab === 'history' && <HistoryList user={user} onOpenExerciseInfo={handleOpenExerciseInfo} />}
       {activeTab === 'stats' && <StatsView user={user} />}
       {activeTab === 'diet' && <DietView user={user} />}
       {activeTab === 'profile' && <ProfileView user={user} onLogout={() => { setUser(null); setActiveRoutineId(null); setActiveTab('home'); }} />}
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <BottomNav activeTab={activeTab} setActiveTab={navigateToTab} />
       <ExerciseInfo exercise={selectedExercise} isOpen={isExerciseInfoOpen} onClose={() => setIsExerciseInfoOpen(false)} />
     </div>
   );

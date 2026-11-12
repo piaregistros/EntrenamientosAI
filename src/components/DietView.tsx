@@ -138,7 +138,7 @@ export default function DietView({ user }: { user: any }) {
 
   return (
     <div className="max-w-md mx-auto px-4 pt-6 pb-28 text-neutral-100">
-      <p className="text-lime-400 text-xs uppercase tracking-[0.2em] font-semibold">Nutricion</p>
+      <p className="text-lime-400 text-xs uppercase tracking-[0.2em] font-semibold">Nutrición</p>
       <h1 className="text-2xl font-bold mt-1 flex items-center gap-2">
         <Utensils size={22} className="text-lime-400" /> Dieta
       </h1>

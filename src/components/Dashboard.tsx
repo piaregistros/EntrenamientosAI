@@ -464,7 +464,7 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
           >
             <div className="flex justify-between items-start">
               <div>
-                <span className="text-[10px] font-bold text-lime-400 uppercase tracking-widest">Resumen de Routine</span>
+                <span className="text-[10px] font-bold text-lime-400 uppercase tracking-widest">Resumen de rutina</span>
                 <h3 id="preview-routine-title" className="text-xl font-extrabold text-white mt-1">
                   {selectedRoutineForPreview.name}
                   {(selectedRoutineForPreview as any).session_label ? ` · ${(selectedRoutineForPreview as any).session_label}` : ''}

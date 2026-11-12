@@ -144,13 +144,13 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
     setSuccess(null);
 
     try {
-      const res = await apiFetch(`/api/body-metrics/${metricId}`, {
+      const res = await apiFetch(`/api/body-metrics/${metricId}?user_id=${encodeURIComponent(user.id)}`, {
         method: 'DELETE',
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'No se pudo eliminar la métrica');
+        const data = await res.json().catch(() => ({}));
+        throw new Error(typeof data.detail === 'string' ? data.detail : (data.error || 'No se pudo eliminar la métrica'));
       }
 
       setSuccess('Métrica eliminada.');

@@ -21,6 +21,15 @@ function isTimedExercise(exercise: any) {
     .toLowerCase() === "plancha";
 }
 
+// Peso inicial cuando no hay historial ni recomendación: nunca un valor inventado.
+// Peso corporal puro / ejercicios por tiempo -> 0; resto -> vacío (el usuario elige).
+function defaultStartWeight(item: any): string {
+  if (isTimedExercise(item)) return '0';
+  const equip = String(item?.exercise?.equipment || '').trim().toLowerCase();
+  if (equip === 'peso corporal') return '0';
+  return '';
+}
+
 export default function WorkoutActive({
   user,
   routineId,
@@ -475,9 +484,7 @@ export default function WorkoutActive({
       setInputWeight(
         recommendedWeight != null
           ? String(recommendedWeight)
-          : isTimedExercise(activeExerciseItem)
-            ? '0'
-            : '20'
+          : defaultStartWeight(activeExerciseItem)
       );
 
       setInputReps(
@@ -489,10 +496,10 @@ export default function WorkoutActive({
       const lastWeight = lastPerf.sets[0].weight_kg;
       const lastReps = lastPerf.sets[0].reps;
 
-      setInputWeight(lastWeight != null ? String(lastWeight) : '20');
+      setInputWeight(lastWeight != null ? String(lastWeight) : defaultStartWeight(activeExerciseItem));
       setInputReps(lastReps != null ? String(lastReps) : '1');
     } else {
-      setInputWeight(isTimedExercise(activeExerciseItem) ? '0' : '20');
+      setInputWeight(defaultStartWeight(activeExerciseItem));
       setInputReps(
         activeExerciseItem.target_rep_min != null
           ? String(activeExerciseItem.target_rep_min)
@@ -942,7 +949,9 @@ export default function WorkoutActive({
                   <p className="text-[11px] text-lime-400 font-bold mt-1">
                     {isTimedExercise(activeExerciseItem)
                       ? `Intenta aguantar ${activeRec.recommended_rep_target} segundos en plancha`
-                      : `Usa ${activeRec.recommended_weight_kg} kg · apunta a ${activeRec.recommended_rep_target} reps`
+                      : activeRec.recommended_weight_kg == null
+                        ? `Sin historial: elige un peso cómodo y apunta a ${activeRec.recommended_rep_target ?? activeExerciseItem.target_rep_min} reps`
+                        : `Usa ${activeRec.recommended_weight_kg} kg · apunta a ${activeRec.recommended_rep_target} reps`
                     }
                   </p>
                   <p className="text-[10px] text-neutral-400 mt-1 leading-relaxed">{activeRec.reason}</p>
