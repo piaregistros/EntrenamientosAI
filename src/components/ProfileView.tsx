@@ -3,6 +3,7 @@ import { User, Lock, Trash2, KeyRound, Loader, AlertCircle, CheckCircle2, LogOut
 import { BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
 import ThemeToggle from './ThemeToggle';
+import ManageView from './ManageView';
 
 interface ProfileViewProps {
   user: any;
@@ -24,6 +25,7 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [submittingPassword, setSubmittingPassword] = useState(false);
 
+  const [showManage, setShowManage] = useState(false);
   const [adminUsers, setAdminUsers] = useState<{id:string;name:string;role:string;test_line?:string;use_line?:string}[]>([]);
   const loadUsers = async () => {
     const res = await apiFetch('/api/auth/admin/users');
@@ -258,6 +260,8 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
     }
   };
 
+  if (showManage) return <ManageView user={user} onBack={() => setShowManage(false)} />;
+
   return (
     <div id="profile-panel-container" className="min-h-screen bg-neutral-950 text-neutral-100 pb-24 px-4 pt-6 max-w-md mx-auto select-none space-y-6">
       
@@ -340,6 +344,11 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
       )}
 
       <ThemeToggle />
+      <button type="button" id="btn-open-manage" onClick={() => setShowManage(true)}
+        className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-left">
+        <h3 className="text-sm font-extrabold text-white">Gestionar rutinas y ejercicios</h3>
+        <p className="text-[11px] text-neutral-500">Crea, edita, reordena o borra rutinas y ejercicios propios.</p>
+      </button>
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-3">
         <h3 className="text-sm font-extrabold text-white">Nuevo ejercicio</h3>
         <p className="text-[11px] text-neutral-500">Escribe el nombre. Se busca online y se rellena la ficha. Revísala antes de guardar.</p>

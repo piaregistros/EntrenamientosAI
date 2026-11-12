@@ -18,7 +18,11 @@ export function rebuildSessionExercises(
       ...item,
       exercise_id: sub.substitute_exercise_id,
       exercise: sub.substitute_exercise,
-      last_performance: null,
+      // Fase 7: el hueco recuerda qué ejercicio de la rutina ocupa, y el historial es el del SUSTITUTO.
+      original_exercise_id: originalId,
+      last_performance: sub.last_performance
+        ? { date: sub.last_performance.date, sets: sub.last_performance.sets || [] }
+        : null,
     };
     // La marca amarilla de la pestaña se consulta por el ejercicio que se hace ahora.
     substitutionsMap[sub.substitute_exercise_id] = substituted;

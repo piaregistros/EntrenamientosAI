@@ -3,10 +3,11 @@ import { Play, Dumbbell, Timer, ArrowRight, ArrowLeft, Plus, Check, Trash2, Refr
 // share icons added below if missing
 
 import { motion, AnimatePresence } from 'motion/react';
-import { Exercise, Routine, RoutineExercise, WorkoutLog, WorkoutSet, ExerciseSubstitution } from '../types';
+import { Exercise, Routine, RoutineExercise, WorkoutLog, WorkoutSet, ExerciseSubstitution, SubstituteResponse, SubstituteOption } from '../types';
 import { apiFetch } from '../lib/api';
 import { isTimedExercise, rememberMeasure, fmtKg } from '../lib/measure';
 import { rebuildSessionExercises } from '../lib/rebuildSession';
+import ExerciseIcon from './ExerciseIcon';
 
 interface WorkoutActiveProps {
   user: any;
@@ -67,6 +68,11 @@ export default function WorkoutActive({
   const [extraId, setExtraId] = useState('');
   const [availableSubs, setAvailableSubs] = useState<any[]>([]);
   const [subReason, setSubReason] = useState('No disponible');
+  // Fase 7: selector de sustituciones con buscador, equipo no disponible y «usar siempre en la rutina»
+  const [subData, setSubData] = useState<SubstituteResponse | null>(null);
+  const [subQuery, setSubQuery] = useState('');
+  const [subLoading, setSubLoading] = useState(false);
+  const [subAlways, setSubAlways] = useState(false);
   const [substitutionsMap, setSubstitutionsMap] = useState<Record<string, RoutineExercise>>({});
 
   // Loading states
@@ -335,7 +341,7 @@ export default function WorkoutActive({
       }
 
       // 3. Fetch recommendations for the progression rule
-      const recsRes = await apiFetch(`/api/routines/${routineId}/recommendations?user_id=${encodeURIComponent(user.id)}`);
+      const recsRes = await apiFetch(`/api/routines/${routineId}/recommendations?user_id=${encodeURIComponent(user.id)}${startData?.id ? `&workout_id=${encodeURIComponent(startData.id)}` : ''}`);
       if (recsRes.ok) {
         const recsData = await recsRes.json();
         (recsData.recommendations || []).forEach((r: any) => rememberMeasure(r.exercise_id, r.measure_type));
@@ -483,25 +489,6 @@ export default function WorkoutActive({
       void persistCurrentExercise(exerciseId);
     }
   };
-
-  const exerciseIcon = (name?: string, _muscle?: string) => {
-  const n = (name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const go = (f: string) => '/icons4/' + f + '?v=1';
-  if (n.includes('plancha') || n.includes('crunch') || n.includes('rodilla') || n.includes('pallof')) return go('plancha.jpg');
-  if (n.includes('prensa')) return go('prensa.jpg');
-  if (n.includes('femoral') || n.includes('peso muerto') || n.includes('hip') || n.includes('patada') || n.includes('abduc') || n.includes('cadera')) return go('hip.jpg');
-  if (n.includes('jalon') || n.includes('estirar') || n.includes('pullover')) return go('jalon.jpg');
-  if (n.includes('remo')) return go('remo.jpg');
-  if (n.includes('lateral')) return go('lateral.jpg');
-  if (n.includes('gemelo')) return go('gemelo.jpg');
-  if (n.includes('tricep') || n.includes('frances')) return go('triceps.jpg');
-  if (n.includes('curl') || n.includes('bicep') || n.includes('martillo')) return go('curl.jpg');
-  if (n.includes('hombro') || n.includes('militar') || n.includes('pajaro') || n.includes('face')) return go('hombro.jpg');
-  if (n.includes('banca') || n.includes('apertura') || n.includes('cruce') || n.includes('convergente') || (n.includes('inclinado') && !n.includes('curl'))) return go('banca.jpg');
-  if (n.includes('sentadilla') || n.includes('zancada') || n.includes('hack') || n.includes('goblet') || n.includes('step')) return go('sentadilla.jpg');
-  if (n.includes('cuadricep')) return go('sentadilla.jpg');
-  return go('prensa.jpg');
-};
 
   const activeExerciseItem = exercises[activeExIndex];
   const activeExercise = activeExerciseItem?.exercise;
@@ -710,21 +697,57 @@ export default function WorkoutActive({
     }
   };
 
+  // Hueco de la rutina que ocupa el ejercicio activo (si ya está sustituido, el original de la rutina).
+  const slotOriginalId = (item: any): string => item?.original_exercise_id || item?.exercise?.id || item?.exercise_id;
+
+  const loadSubstitutions = async (query: string) => {
+    if (!activeExercise) return;
+    setSubLoading(true);
+    try {
+      const qs = new URLSearchParams({ user_id: String(user.id) });
+      if (workoutLog?.id) qs.set('workout_id', String(workoutLog.id));
+      if (query.trim()) qs.set('q', query.trim());
+      const res = await apiFetch(`/api/exercises/${slotOriginalId(activeExerciseItem)}/substitutions?${qs.toString()}`);
+      if (!res.ok) throw new Error('No se encontraron alternativas.');
+      const data = await res.json();
+      setSubData(Array.isArray(data) ? { substitutions: data } as any : data);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar sustituciones.');
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
   // Open substitutions selector
   const handleOpenSubstitutions = async () => {
     if (!activeExercise) return;
     setShowSubModal(true);
     setAvailableSubs([]);
+    setSubData(null);
+    setSubQuery('');
+    setSubAlways(false);
     setError(null);
-    try {
-      const res = await apiFetch(`/api/exercises/${activeExercise.id}/substitutions?user_id=${encodeURIComponent(user.id)}`);
-      if (!res.ok) throw new Error('No se encontraron alternativas.');
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.substitutions || []);
-      setAvailableSubs(list);
-    } catch (err: any) {
-      setError(err.message || 'Error al cargar sustituciones.');
-    }
+    await loadSubstitutions('');
+  };
+
+  // Buscador: con texto se busca en TODO el catálogo (con un pequeño retardo al teclear).
+  useEffect(() => {
+    if (!showSubModal) return;
+    const t = setTimeout(() => { void loadSubstitutions(subQuery); }, subQuery ? 250 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subQuery]);
+
+  const toggleUnavailableEquipment = async (family: string) => {
+    const current = new Set(subData?.unavailable_equipment || []);
+    if (current.has(family)) current.delete(family); else current.add(family);
+    const res = await apiFetch(`/api/user-equipment?user_id=${encodeURIComponent(user.id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unavailable: Array.from(current) }),
+    });
+    if (res.ok) await loadSubstitutions(subQuery);
   };
 
   // Execute substitution
@@ -734,15 +757,17 @@ export default function WorkoutActive({
     setError(null);
 
     try {
+      const originalId = slotOriginalId(activeExerciseItem);
       const res = await apiFetch(`/api/workouts/${workoutLog.id}/substitute-exercise?user_id=${encodeURIComponent(user.id)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          original_exercise_id: activeExercise.id,
+          original_exercise_id: originalId,
           substitute_exercise_id: alternativeExerciseId,
-          reason: subReason
+          reason: subReason,
+          always_in_routine: subAlways ? true : undefined,
         })
       });
 
@@ -753,25 +778,38 @@ export default function WorkoutActive({
 
       // Success! Update active exercises list locally
       const updatedExercises = [...exercises];
-      // Build a modified routine exercise with the substitute
-      const substitutedExItem: RoutineExercise = {
+      // Build a modified routine exercise with the substitute. El historial y la carga sugerida son
+      // los del SUSTITUTO (los calcula el servidor con el rango de series/reps del hueco).
+      const substitutedExItem: any = {
         ...activeExerciseItem,
         exercise_id: alternativeExerciseId,
+        original_exercise_id: originalId,
         exercise: data.substitute_exercise,
-        last_performance: data.last_performance ? {
-          date: new Date().toISOString(),
-          sets: data.last_performance
-        } : null
+        last_performance: data.last_performance_detail
+          ? { date: data.last_performance_detail.date, sets: data.last_performance_detail.sets || [] }
+          : null
       };
 
       updatedExercises[activeExIndex] = substitutedExItem;
       setExercises(updatedExercises);
-      
+
+      // La recomendación del sustituto sustituye a la del ejercicio original.
+      if (data.recommendation) {
+        rememberMeasure(data.recommendation.exercise_id, data.recommendation.measure_type);
+        setRecommendations((prev) => [
+          ...prev.filter((r) => r.exercise_id !== data.recommendation.exercise_id && r.exercise_id !== originalId
+            && r.exercise_id !== activeExercise.id),
+          data.recommendation,
+        ]);
+      }
+      // Las sugerencias de carga del navegador son del ejercicio anterior: no valen para el sustituto.
+      delete lastWeightByExercise.current[String(alternativeExerciseId)];
+
       // Update substitutions tracking map
-      setSubstitutionsMap({
-        ...substitutionsMap,
-        [alternativeExerciseId]: substitutedExItem
-      });
+      const nextMap = { ...substitutionsMap };
+      delete nextMap[activeExercise.id];
+      nextMap[alternativeExerciseId] = substitutedExItem;
+      setSubstitutionsMap(nextMap);
 
       setShowSubModal(false);
       if (data.substitute_exercise?.id) {
@@ -868,7 +906,7 @@ export default function WorkoutActive({
                   style={{ minWidth: '100px' }}
                 >
                   <span className="opacity-60">{idx + 1}.</span>
-                  <span className="truncate max-w-[110px] flex items-center gap-1"><img src={exerciseIcon(re.exercise?.name, re.exercise?.target_muscle)} alt="" className="w-6 h-6 rounded object-cover bg-white" />{re.exercise?.name}</span>
+                  <span className="truncate max-w-[110px] flex items-center gap-1"><ExerciseIcon exercise={re.exercise} className="w-6 h-6 rounded" />{re.exercise?.name}</span>
                   {setsCount > 0 && (
                     <span className="bg-lime-500 text-black w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold">
                       {setsCount}
@@ -925,7 +963,7 @@ export default function WorkoutActive({
               <div>
                 <span className="text-[10px] font-bold text-lime-400 uppercase tracking-widest">{activeExercise.target_muscle}</span>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <img src={exerciseIcon(activeExercise?.name, activeExercise?.target_muscle)} alt="" className="w-12 h-12 rounded-xl object-cover bg-white mr-2" /><h3 id="active-exercise-name" className="text-xl font-extrabold text-white leading-tight">{activeExercise.name}</h3>
+                  <ExerciseIcon exercise={activeExercise} className="w-12 h-12 rounded-xl mr-2" /><h3 id="active-exercise-name" className="text-xl font-extrabold text-white leading-tight">{activeExercise.name}</h3>
                   {onOpenExerciseInfo && (
                     <button
                       onClick={() => onOpenExerciseInfo(activeExercise)}
@@ -1425,33 +1463,87 @@ export default function WorkoutActive({
               </select>
             </div>
 
+            {/* Equipo que no está libre en el gimnasio */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Equipo no disponible</label>
+              <div className="flex flex-wrap gap-1.5">
+                {['mancuernas', 'maquina', 'polea', 'barra', 'peso corporal'].map((fam) => {
+                  const off = (subData?.unavailable_equipment || []).includes(fam);
+                  return (
+                    <button key={fam} type="button" id={`btn-equip-${fam.replace(' ', '-')}`}
+                      onClick={() => toggleUnavailableEquipment(fam)}
+                      className={`text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg border transition-all ${off ? 'bg-red-500/15 border-red-500/40 text-red-300' : 'bg-neutral-950 border-neutral-800 text-neutral-400'}`}>
+                      {fam === 'maquina' ? 'máquina' : fam}{off ? ' ✕' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+              {subData?.original_unavailable && (
+                <p className="text-[10px] text-amber-300">El equipo de {activeExercise?.name} está marcado como no disponible: las alternativas libres salen primero.</p>
+              )}
+            </div>
+
+            {/* Buscador: cualquier ejercicio del catálogo */}
+            <div className="relative">
+              <input
+                id="input-sub-search"
+                value={subQuery}
+                onChange={(e) => setSubQuery(e.target.value)}
+                placeholder="Buscar cualquier ejercicio del catálogo…"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl py-2.5 px-3.5 text-white text-xs font-bold focus:outline-none focus:border-lime-500/50"
+              />
+              {subLoading && <Loader size={14} className="absolute right-3 top-3 animate-spin text-neutral-500" />}
+            </div>
+
+            <label className="flex items-center gap-2 text-[11px] text-neutral-300 font-semibold">
+              <input id="chk-sub-always" type="checkbox" checked={subAlways} onChange={(e) => setSubAlways(e.target.checked)} className="accent-lime-400" />
+              Usar siempre esta sustitución en esta rutina
+            </label>
+
             <div className="space-y-3">
-              <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Alternativas Recomendadas</h4>
-              {availableSubs.length > 0 ? (
+              <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                {subQuery.trim() ? 'Resultados de la búsqueda' : 'Alternativas, de más a menos parecidas'}
+              </h4>
+              {(subData?.substitutions || []).length > 0 ? (
                 <div className="space-y-2.5">
-                  {availableSubs.map((sub: any) => {
-                    const alt = sub.alternative_exercise || { id: sub.exercise_id, name: sub.name };
+                  {(subData?.substitutions || []).map((sub: SubstituteOption) => {
+                    const levelLabel = sub.match_level === 'pattern' ? 'Mismo patrón'
+                      : sub.match_level === 'muscle' ? 'Mismo músculo'
+                      : sub.match_level === 'related' ? 'Grupo parecido' : '';
                     return (
                       <div
-                        key={sub.id}
-                        id={`sub-item-${alt.id}`}
-                        className="bg-neutral-950/60 border border-neutral-800/80 hover:border-neutral-700/80 p-4 rounded-xl flex justify-between items-center transition-all cursor-pointer group"
-                        onClick={() => handleSelectSubstitution(alt?.id || sub.exercise_id || sub.alternative_exercise_id)}
+                        key={sub.exercise_id}
+                        id={`sub-item-${sub.exercise_id}`}
+                        className={`bg-neutral-950/60 border ${sub.is_habitual ? 'border-lime-500/40' : 'border-neutral-800/80'} hover:border-neutral-700/80 p-4 rounded-xl flex justify-between items-center transition-all cursor-pointer group`}
+                        onClick={() => !submittingSub && handleSelectSubstitution(sub.exercise_id)}
                       >
-                        <div className="space-y-1 pr-4">
-                          <p className="text-xs font-extrabold text-white group-hover:text-lime-400 transition-colors">{alt.name}</p>
+                        <div className="space-y-1 pr-4 min-w-0">
+                          {sub.is_habitual && (
+                            <span className="text-[8px] bg-lime-400 text-black px-1.5 py-0.5 rounded font-black uppercase">Tu elección habitual</span>
+                          )}
+                          <p className="text-xs font-extrabold text-white group-hover:text-lime-400 transition-colors">{sub.name}</p>
+                          <p className="text-[9px] text-neutral-500 font-medium leading-normal">{sub.equipment}{sub.target_muscle ? ` · ${sub.target_muscle}` : ''}</p>
                           <p className="text-[9px] text-neutral-500 font-medium leading-normal">{sub.reason}</p>
-                          <div className="flex gap-2 mt-1">
-                            {sub.same_muscle && (
-                              <span className="text-[8px] bg-lime-500/10 border border-lime-500/20 text-lime-400 px-1.5 py-0.5 rounded font-bold uppercase">Mismo Músculo</span>
+                          {sub.suggested_weight_kg != null && (
+                            <p className="text-[9px] text-lime-300 font-semibold">Tu carga: {sub.suggested_weight_kg} kg{sub.suggested_reps ? ` × ${sub.suggested_reps}` : ''}</p>
+                          )}
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {levelLabel && (
+                              <span className="text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">{levelLabel}</span>
                             )}
-                            {sub.same_movement_pattern && (
-                              <span className="text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">Mismo Patrón</span>
+                            {sub.previously_used && !sub.is_habitual && (
+                              <span className="text-[8px] bg-neutral-800 border border-neutral-700 text-neutral-300 px-1.5 py-0.5 rounded font-bold uppercase">Ya la has usado</span>
+                            )}
+                            {sub.unavailable_equipment && (
+                              <span className="text-[8px] bg-red-500/10 border border-red-500/30 text-red-300 px-1.5 py-0.5 rounded font-bold uppercase">Equipo no disponible</span>
+                            )}
+                            {sub.always_in_routine && (
+                              <span className="text-[8px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-1.5 py-0.5 rounded font-bold uppercase">Fija en esta rutina</span>
                             )}
                           </div>
                         </div>
                         <button
-                          id={`btn-select-sub-${alt.id}`}
+                          id={`btn-select-sub-${sub.exercise_id}`}
                           disabled={submittingSub}
                           className="bg-neutral-800 text-neutral-300 hover:text-white px-3 py-2 rounded-lg text-[10px] font-extrabold shrink-0 active:scale-95 transition-all"
                           style={{ minHeight: '32px' }}
@@ -1463,7 +1555,9 @@ export default function WorkoutActive({
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-neutral-500 text-center py-4">No se encontraron alternativas directas configuradas para este ejercicio.</p>
+                <p className="text-xs text-neutral-500 text-center py-4">
+                  {subLoading ? 'Buscando…' : subQuery.trim() ? 'Ningún ejercicio coincide con la búsqueda.' : 'No hay alternativas parecidas: usa el buscador para elegir cualquier ejercicio.'}
+                </p>
               )}
             </div>
           </motion.div>

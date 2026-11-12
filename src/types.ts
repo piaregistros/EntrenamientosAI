@@ -171,3 +171,35 @@ export interface PRRecord {
   date: string;
   estimated_1rm: number;
 }
+
+// Fase 7: alternativa devuelta por GET /api/exercises/{id}/substitutions
+export interface SubstituteOption {
+  exercise_id: string;
+  name: string;
+  target_muscle?: string | null;
+  category?: string | null;
+  equipment?: string | null;
+  movement_pattern?: string | null;
+  score: number;
+  match_level: 'pattern' | 'muscle' | 'related' | 'other';
+  reason: string;
+  suggested: boolean;
+  curated: boolean;
+  is_habitual: boolean;
+  previously_used: boolean;
+  times_used: number;
+  always_in_routine: boolean;
+  unavailable_equipment: boolean;
+  suggested_weight_kg?: number | null;
+  suggested_reps?: number | null;
+}
+
+export interface SubstituteResponse {
+  exercise_id: string;
+  exercise_name: string;
+  equipment?: string | null;
+  original_unavailable: boolean;
+  proposed_exercise_id: string | null;
+  unavailable_equipment: string[];
+  substitutions: SubstituteOption[];
+}

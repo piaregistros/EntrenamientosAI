@@ -1,0 +1,415 @@
+[
+ {
+  "name": "Abducción de cadera en máquina",
+  "target_muscle": "Glúteo medio",
+  "category": "glúteos",
+  "equipment": "Máquina",
+  "movement_pattern": "abduccion_cadera"
+ },
+ {
+  "name": "Aperturas de pecho en máquina",
+  "target_muscle": "Pectoral",
+  "category": "pecho",
+  "equipment": "Máquina",
+  "movement_pattern": "aduccion_hombro"
+ },
+ {
+  "name": "Cruce de poleas",
+  "target_muscle": "Pectoral",
+  "category": "pecho",
+  "equipment": "Polea",
+  "movement_pattern": "aduccion_hombro"
+ },
+ {
+  "name": "Curl de bíceps en máquina",
+  "target_muscle": "Bíceps",
+  "category": "brazos",
+  "equipment": "Máquina",
+  "movement_pattern": "flexion_codo"
+ },
+ {
+  "name": "Curl femoral",
+  "target_muscle": "Isquiosurales",
+  "category": "pierna",
+  "equipment": "Máquina",
+  "movement_pattern": "flexion_rodilla"
+ },
+ {
+  "name": "Curl femoral sentado",
+  "target_muscle": "Isquiosurales",
+  "category": "pierna",
+  "equipment": "Máquina",
+  "movement_pattern": "flexion_rodilla"
+ },
+ {
+  "name": "Curl femoral tumbado",
+  "target_muscle": "Isquiosurales",
+  "category": "pierna",
+  "equipment": "Máquina",
+  "movement_pattern": "flexion_rodilla"
+ },
+ {
+  "name": "Elevaciones laterales con mancuernas",
+  "target_muscle": "Deltoides lateral",
+  "category": "hombro",
+  "equipment": "Mancuernas",
+  "movement_pattern": "abduccion_hombro"
+ },
+ {
+  "name": "Elevaciones laterales en máquina",
+  "target_muscle": "Deltoides lateral",
+  "category": "hombro",
+  "equipment": "Máquina",
+  "movement_pattern": "abduccion_hombro"
+ },
+ {
+  "name": "Elevaciones laterales en polea",
+  "target_muscle": "Deltoides lateral",
+  "category": "hombro",
+  "equipment": "Polea",
+  "movement_pattern": "abduccion_hombro"
+ },
+ {
+  "name": "Extensión de cuádriceps",
+  "target_muscle": "Cuádriceps",
+  "category": "pierna",
+  "equipment": "Máquina",
+  "movement_pattern": "extension_rodilla"
+ },
+ {
+  "name": "Extensión de tríceps en polea",
+  "target_muscle": "Tríceps",
+  "category": "brazos",
+  "equipment": "Polea",
+  "movement_pattern": "extension_codo"
+ },
+ {
+  "name": "Face pull",
+  "target_muscle": "Deltoides posterior y espalda alta",
+  "category": "hombro",
+  "equipment": "Polea",
+  "movement_pattern": "traccion_horizontal"
+ },
+ {
+  "name": "Hack squat",
+  "target_muscle": "Cuádriceps y glúteos",
+  "category": "pierna",
+  "equipment": "Máquina",
+  "movement_pattern": "sentadilla"
+ },
+ {
+  "name": "Hip thrust",
+  "target_muscle": "Glúteos",
+  "category": "pierna",
+  "equipment": "Barra o máquina",
+  "movement_pattern": "extension_cadera"
+ },
+ {
+  "name": "Jalón al pecho agarre amplio",
+  "target_muscle": "Dorsal",
+  "category": "espalda",
+  "equipment": "Polea",
+  "movement_pattern": "traccion_vertical"
+ },
+ {
+  "name": "Jalón al pecho agarre neutro",
+  "target_muscle": "Dorsal",
+  "category": "tirón",
+  "equipment": "Polea",
+  "movement_pattern": "traccion_vertical"
+ },
+ {
+  "name": "Jalón unilateral en polea",
+  "target_muscle": "Dorsal",
+  "category": "espalda",
+  "equipment": "Polea",
+  "movement_pattern": "traccion_vertical"
+ },
+ {
+  "name": "Patada de glúteo en polea",
+  "target_muscle": "Glúteo mayor",
+  "category": "glúteos",
+  "equipment": "Polea",
+  "movement_pattern": "extension_cadera"
+ },
+ {
+  "name": "Peso muerto rumano",
+  "target_muscle": "Isquiosurales y glúteos",
+  "category": "pierna",
+  "equipment": "Barra",
+  "movement_pattern": "bisagra_cadera"
+ },
+ {
+  "name": "Peso muerto rumano con mancuernas",
+  "target_muscle": "Isquiosurales y glúteos",
+  "category": "pierna",
+  "equipment": "Mancuernas",
+  "movement_pattern": "bisagra_cadera"
+ },
+ {
+  "name": "Plancha",
+  "target_muscle": "Core",
+  "category": "core",
+  "equipment": "Peso corporal",
+  "movement_pattern": "anti_extension"
+ },
+ {
+  "name": "Prensa de piernas",
+  "target_muscle": "Cuádriceps y glúteos",
+  "category": "pierna",
+  "equipment": "Máquina",
+  "movement_pattern": "sentadilla"
+ },
+ {
+  "name": "Press banca con mancuernas",
+  "target_muscle": "Pectoral",
+  "category": "pecho",
+  "equipment": "Mancuernas",
+  "movement_pattern": "empuje_horizontal"
+ },
+ {
+  "name": "Press banca plano",
+  "target_muscle": "Pectoral",
+  "category": "empuje",
+  "equipment": "Barra",
+  "movement_pattern": "empuje_horizontal"
+ },
+ {
+  "name": "Press convergente de pecho",
+  "target_muscle": "Pectoral",
+  "category": "pecho",
+  "equipment": "Máquina",
+  "movement_pattern": "empuje_horizontal"
+ },
+ {
+  "name": "Press de hombro con mancuernas agarre neutro",
+  "target_muscle": "Deltoides",
+  "category": "empuje",
+  "equipment": "Mancuernas",
+  "movement_pattern": "empuje_vertical"
+ },
+ {
+  "name": "Press de hombros en máquina",
+  "target_muscle": "Deltoides",
+  "category": "hombro",
+  "equipment": "Máquina",
+  "movement_pattern": "empuje_vertical"
+ },
+ {
+  "name": "Press inclinado con mancuernas 30 grados",
+  "target_muscle": "Pectoral superior",
+  "category": "empuje",
+  "equipment": "Mancuernas",
+  "movement_pattern": "empuje_horizontal"
+ },
+ {
+  "name": "Press inclinado en máquina",
+  "target_muscle": "Pectoral superior",
+  "category": "pecho",
+  "equipment": "Máquina",
+  "movement_pattern": "empuje_horizontal"
+ },
+ {
+  "name": "Press militar con barra",
+  "target_muscle": "Deltoides",
+  "category": "hombro",
+  "equipment": "Barra",
+  "movement_pattern": "empuje_vertical"
+ },
+ {
+  "name": "Pullover en polea",
+  "target_muscle": "Dorsal",
+  "category": "espalda",
+  "equipment": "Polea",
+  "movement_pattern": "extension_hombro"
+ },
+ {
+  "name": "Pájaros en máquina",
+  "target_muscle": "Deltoides posterior",
+  "category": "hombro",
+  "equipment": "Máquina",
+  "movement_pattern": "abduccion_horizontal"
+ },
+ {
+  "name": "Remo con pecho apoyado",
+  "target_muscle": "Dorsal y espalda media",
+  "category": "tirón",
+  "equipment": "Máquina o banco",
+  "movement_pattern": "traccion_horizontal"
+ },
+ {
+  "name": "Remo en máquina",
+  "target_muscle": "Espalda media",
+  "category": "espalda",
+  "equipment": "Máquina",
+  "movement_pattern": "traccion_horizontal"
+ },
+ {
+  "name": "Remo sentado en polea",
+  "target_muscle": "Espalda media",
+  "category": "espalda",
+  "equipment": "Polea",
+  "movement_pattern": "traccion_horizontal"
+ },
+ {
+  "name": "Remo unilateral con mancuerna",
+  "target_muscle": "Dorsal y espalda media",
+  "category": "tirón",
+  "equipment": "Mancuerna",
+  "movement_pattern": "traccion_horizontal"
+ },
+ {
+  "name": "Remo unilateral en polea",
+  "target_muscle": "Dorsal y espalda media",
+  "category": "espalda",
+  "equipment": "Polea",
+  "movement_pattern": "traccion_horizontal"
+ },
+ {
+  "name": "Sentadilla búlgara",
+  "target_muscle": "Cuádriceps y glúteos",
+  "category": "unilateral",
+  "equipment": "Mancuernas o peso corporal",
+  "movement_pattern": "sentadilla"
+ },
+ {
+  "name": "Sentadilla goblet",
+  "target_muscle": "Cuádriceps y glúteos",
+  "category": "pierna",
+  "equipment": "Mancuerna",
+  "movement_pattern": "sentadilla"
+ },
+ {
+  "name": "Sentadilla libre",
+  "target_muscle": "Cuádriceps y glúteos",
+  "category": "pierna",
+  "equipment": "Barra",
+  "movement_pattern": "sentadilla"
+ },
+ {
+  "name": "Zancadas",
+  "target_muscle": "Cuádriceps y glúteos",
+  "category": "unilateral",
+  "equipment": "Mancuernas o peso corporal",
+  "movement_pattern": "zancada"
+ },
+ {
+  "name": "Hip thrust unilateral",
+  "target_muscle": "Glúteo mayor",
+  "category": "glúteos",
+  "equipment": "Máquina o banco",
+  "movement_pattern": "extension_cadera"
+ },
+ {
+  "name": "Prensa unilateral",
+  "target_muscle": "Cuádriceps y glúteos",
+  "category": "pierna",
+  "equipment": "Máquina",
+  "movement_pattern": "sentadilla"
+ },
+ {
+  "name": "Step-up",
+  "target_muscle": "Glúteos y cuádriceps",
+  "category": "pierna",
+  "equipment": "Mancuernas",
+  "movement_pattern": "zancada"
+ },
+ {
+  "name": "Extensión de cadera en máquina",
+  "target_muscle": "Glúteo mayor",
+  "category": "glúteos",
+  "equipment": "Máquina",
+  "movement_pattern": "extension_cadera"
+ },
+ {
+  "name": "Elevación de gemelos de pie",
+  "target_muscle": "Gemelos",
+  "category": "pierna",
+  "equipment": "Máquina",
+  "movement_pattern": "flexion_plantar"
+ },
+ {
+  "name": "Elevación de gemelos sentado",
+  "target_muscle": "Gemelos",
+  "category": "pierna",
+  "equipment": "Máquina",
+  "movement_pattern": "flexion_plantar"
+ },
+ {
+  "name": "Curl con mancuernas",
+  "target_muscle": "Bíceps",
+  "category": "brazos",
+  "equipment": "Mancuernas",
+  "movement_pattern": "flexion_codo"
+ },
+ {
+  "name": "Curl inclinado con mancuernas",
+  "target_muscle": "Bíceps",
+  "category": "brazos",
+  "equipment": "Mancuernas",
+  "movement_pattern": "flexion_codo"
+ },
+ {
+  "name": "Curl martillo",
+  "target_muscle": "Braquial y bíceps",
+  "category": "brazos",
+  "equipment": "Mancuernas",
+  "movement_pattern": "flexion_codo"
+ },
+ {
+  "name": "Curl de bíceps en polea",
+  "target_muscle": "Bíceps",
+  "category": "brazos",
+  "equipment": "Polea",
+  "movement_pattern": "flexion_codo"
+ },
+ {
+  "name": "Extensión de tríceps con cuerda",
+  "target_muscle": "Tríceps",
+  "category": "brazos",
+  "equipment": "Polea",
+  "movement_pattern": "extension_codo"
+ },
+ {
+  "name": "Extensión de tríceps por encima de la cabeza",
+  "target_muscle": "Tríceps",
+  "category": "brazos",
+  "equipment": "Polea",
+  "movement_pattern": "extension_codo"
+ },
+ {
+  "name": "Press francés",
+  "target_muscle": "Tríceps",
+  "category": "brazos",
+  "equipment": "Barra",
+  "movement_pattern": "extension_codo"
+ },
+ {
+  "name": "Crunch en polea",
+  "target_muscle": "Recto abdominal",
+  "category": "core",
+  "equipment": "Polea",
+  "movement_pattern": "flexion_columna"
+ },
+ {
+  "name": "Crunch en máquina",
+  "target_muscle": "Recto abdominal",
+  "category": "core",
+  "equipment": "Máquina",
+  "movement_pattern": "flexion_columna"
+ },
+ {
+  "name": "Pallof press",
+  "target_muscle": "Core",
+  "category": "core",
+  "equipment": "Polea",
+  "movement_pattern": "anti_rotacion"
+ },
+ {
+  "name": "Elevación de rodillas",
+  "target_muscle": "Recto abdominal",
+  "category": "core",
+  "equipment": "Peso corporal",
+  "movement_pattern": "flexion_cadera"
+ }
+]
