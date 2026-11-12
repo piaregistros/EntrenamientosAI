@@ -82,6 +82,9 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
         const data = await res.json().catch(() => null);
         throw new Error(data?.detail || 'Error al eliminar el entrenamiento');
       }
+      // Las cargas recomendadas guardadas en el navegador pueden venir del entreno
+      // borrado: se descartan (el servidor ya ha recalculado la progresión).
+      localStorage.removeItem('entreno-next-loads');
       setWorkouts((current) => current.filter((item) => item.id !== workout.id));
       if (expandedWorkoutId === workout.id) setExpandedWorkoutId(null);
     } catch (err: any) {

@@ -251,6 +251,22 @@ export default function WorkoutActive({
       const routData = await routRes.json();
       setRoutine(routData.routine || routData);
 
+      // La carga recomendada guardada en el navegador ('entreno-next-loads') puede
+      // estar obsoleta (p. ej. tras borrar un entreno). Antes de pintar nada se
+      // sustituye SIEMPRE por la que dice el servidor; si no se puede validar, se
+      // descarta en vez de fiarse de ella.
+      try {
+        const homeRes = await apiFetch(`/api/progress/home?user_id=${encodeURIComponent(user.id)}`);
+        if (homeRes.ok) {
+          const homeData = await homeRes.json();
+          localStorage.setItem('entreno-next-loads', JSON.stringify(homeData?.loads || {}));
+        } else {
+          localStorage.removeItem('entreno-next-loads');
+        }
+      } catch {
+        localStorage.removeItem('entreno-next-loads');
+      }
+
       const loadedExercises = (routData.exercises || []).map((item: any) => {
           const sourceExercise = item.exercise || {};
 
