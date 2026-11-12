@@ -39,13 +39,36 @@ export default function StatsView({ user }: StatsViewProps) {
       const sumRes = await apiFetch(`/api/stats/summary?user_id=${encodeURIComponent(user.id)}`);
       if (!sumRes.ok) throw new Error('Error al cargar resumen estadístico');
       const sumData = await sumRes.json();
-      setStatsSummary(sumData);
+      const summary = sumData.summary || sumData;
+      setStatsSummary({
+        completed_workouts: summary.completed_workouts || 0,
+        total_duration_minutes: summary.total_duration_minutes || 0,
+        working_sets: summary.working_sets || 0,
+        total_reps: summary.total_reps || 0,
+        timed_seconds: summary.timed_seconds || 0,
+        total_volume_kg: summary.total_volume_kg || 0,
+      });
+      const hechos = Array.isArray(sumData.exercises) ? sumData.exercises : [];
+      if (hechos.length > 0) {
+        setSelectedExId(hechos[0].id);
+      }
 
       // 2. Fetch personal records
       const prRes = await apiFetch(`/api/stats/prs?user_id=${encodeURIComponent(user.id)}`);
       if (!prRes.ok) throw new Error('Error al cargar records personales (PRs)');
       const prData = await prRes.json();
-      setPrs(prData);
+      const prList = Array.isArray(prData) ? prData : (prData.prs || []);
+      setPrs(prList.map((pr: any) => {
+        const best = pr.best_estimated_1rm || pr.best_weight || pr;
+        return {
+          exercise_id: pr.exercise_id,
+          exercise_name: pr.exercise_name || pr.name || '',
+          weight_kg: best.weight_kg ?? pr.weight_kg ?? 0,
+          reps: best.reps ?? pr.reps ?? 0,
+          date: best.date || pr.date || '',
+          estimated_1rm: best.estimated_1rm_kg ?? pr.estimated_1rm ?? 0,
+        };
+      }));
 
       // 3. Fetch exercises for selection dropdown
       const exRes = await apiFetch('/api/exercises');
@@ -78,7 +101,22 @@ export default function StatsView({ user }: StatsViewProps) {
       const res = await apiFetch(`/api/stats/exercise/${exerciseId}?user_id=${encodeURIComponent(user.id)}`);
       if (res.ok) {
         const data = await res.json();
-        setExHistory(Array.isArray(data) ? data : (Array.isArray(data.history) ? data.history : []));
+        const raw = Array.isArray(data)
+          ? data
+          : (Array.isArray(data.evolution) ? data.evolution : (Array.isArray(data.history) ? data.history : []));
+        setExHistory(raw.map((h: any) => {
+          const sets = Array.isArray(h.sets) ? h.sets : [];
+          const top = sets.reduce(
+            (a: any, s: any) => ((Number(s.weight_kg) || 0) > (Number(a.weight_kg) || 0) ? s : a),
+            sets[0] || {},
+          );
+          return {
+            date: h.date,
+            max_weight_kg: h.max_weight_kg ?? top.weight_kg ?? 0,
+            max_reps: h.max_reps ?? top.reps ?? h.total_reps ?? 0,
+            total_volume_kg: h.total_volume_kg ?? h.volume_kg ?? 0,
+          };
+        }));
       }
     } catch (e) {
       console.error('Error fetching exercise history', e);
@@ -252,7 +290,7 @@ export default function StatsView({ user }: StatsViewProps) {
                         </span>
                         <div className="text-right">
                           <span className="text-xs font-extrabold text-white">{h.max_weight_kg} kg × {h.max_reps} reps</span>
-                          <span className="text-[10px] text-neutral-500 font-semibold block">Vol: {h.total_volume_kg.toLocaleString()} kg</span>
+                          <span className="text-[10px] text-neutral-500 font-semibold block">Vol: {(h.total_volume_kg || 0).toLocaleString()} kg</span>
                         </div>
                       </div>
                     ))}

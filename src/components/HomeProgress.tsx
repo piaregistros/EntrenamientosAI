@@ -73,6 +73,12 @@ export default function HomeProgress({
   return (
     <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-3">
       <p className="text-sm font-bold text-white">{home.tomorrow}</p>
+      {home.overlap.length > 0 && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-200">
+          <p className="font-bold">Se pisan con el último entreno</p>
+          <p className="mt-1">{home.overlap.join(', ')}</p>
+        </div>
+      )}
       <p className="text-[11px] text-neutral-400">
         {home.streak_7} días en 7 · {home.streak_28} en 28
         {home.deload_due ? ' · toca descarga' : ''}

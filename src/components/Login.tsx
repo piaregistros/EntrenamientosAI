@@ -195,15 +195,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           transition={{ delay: 0.3, duration: 0.5 }}
           className="bg-neutral-900/80 backdrop-blur-md rounded-2xl border border-neutral-800 p-6 shadow-2xl space-y-6"
         >
-          {/* Demo Info Banner */}
-          <div className="bg-lime-950/20 border border-lime-800/40 rounded-xl p-3.5 text-xs text-neutral-300 leading-relaxed space-y-1">
-            <div className="font-extrabold text-lime-400 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
-              <span>💡 Modo Demostración</span>
-            </div>
-            <p>La aplicación utiliza una base de datos local preinstalada con rutinas, estadísticas e historial.</p>
-            <p className="text-neutral-400 mt-1">Usa los botones de acceso rápido o pulsa <strong>Entrar como Invitado</strong> abajo para navegar.</p>
-          </div>
-
           {error && (
             <div id="login-error" className="flex items-start gap-3 bg-red-950/40 border border-red-900/50 text-red-300 p-4 rounded-xl text-xs animate-shake">
               <AlertCircle className="shrink-0 mt-0.5" size={16} />

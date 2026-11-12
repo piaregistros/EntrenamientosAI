@@ -24,6 +24,18 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [selectedRoutineForPreview, setSelectedRoutineForPreview] = useState<Routine | null>(null);
+  const [overlap, setOverlap] = useState<{ exercises: string[]; last_routine_name?: string | null } | null>(null);
+
+  const openRoutine = async (routine: Routine) => {
+    setSelectedRoutineForPreview(routine);
+    setOverlap(null);
+    try {
+      const res = await apiFetch(`/api/routines/${routine.id}/overlap`);
+      if (res.ok) setOverlap(await res.json());
+    } catch {
+      setOverlap(null);
+    }
+  };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -283,7 +295,7 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
         </div>
       </div>
 
-      {/* Active Workout Widget */}
+        {/* Active Workout Widget */}
       {activeWorkout && activeWorkout.routine_id && (
         <div
           id="active-workout-card"
@@ -364,11 +376,14 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
             <button
               key={routine.id}
               id={`select-routine-${routine.id}`}
-              onClick={() => setSelectedRoutineForPreview(routine)}
-              className="bg-neutral-900 border border-neutral-800 hover:border-neutral-700 p-3.5 rounded-xl flex flex-col justify-between items-start transition-all active:scale-95 text-left h-24 relative"
+              onClick={() => openRoutine(routine)}
+              className="bg-neutral-900 border border-neutral-800 hover:border-neutral-700 p-3.5 rounded-xl flex flex-col justify-between items-start transition-all active:scale-95 text-left min-h-24 relative"
             >
               <span className="text-[10px] font-bold text-lime-400 uppercase tracking-wide">Rutina {routine.day_order}</span>
               <span className="text-sm font-extrabold text-white leading-tight">{routine.name}</span>
+              {(routine as any).session_label && (
+                <span className="text-[10px] text-neutral-300">{(routine as any).session_label}</span>
+              )}
               <span className="text-[9px] text-neutral-500 mt-1 block">Toca para ver</span>
             </button>
           ))}
@@ -450,7 +465,10 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-[10px] font-bold text-lime-400 uppercase tracking-widest">Resumen de Routine</span>
-                <h3 id="preview-routine-title" className="text-xl font-extrabold text-white mt-1">{selectedRoutineForPreview.name}</h3>
+                <h3 id="preview-routine-title" className="text-xl font-extrabold text-white mt-1">
+                  {selectedRoutineForPreview.name}
+                  {(selectedRoutineForPreview as any).session_label ? ` · ${(selectedRoutineForPreview as any).session_label}` : ''}
+                </h3>
               </div>
               <button
                 id="btn-close-routine-preview"
@@ -504,6 +522,13 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
                 ))}
               </div>
             </div>
+
+            {overlap && overlap.exercises.length > 0 && (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+                <p className="font-bold">Se pisan con el último entreno{overlap.last_routine_name ? ` (${overlap.last_routine_name})` : ''}</p>
+                <p className="mt-1">{overlap.exercises.join(', ')}</p>
+              </div>
+            )}
 
             <button
               id="btn-modal-start-workout"

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from './lib/api';
 import BottomNav from './components/BottomNav';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';

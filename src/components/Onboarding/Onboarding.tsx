@@ -8,6 +8,7 @@ import {
   Sparkles,
   Timer,
   Target,
+  Scale,
 } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 
@@ -177,11 +178,14 @@ export default function Onboarding({
   const [answers, setAnswers] = useState<Partial<Record<AnswerKey, string>>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [weight, setWeight] = useState('');
 
-  const current = questions[step];
-  const Icon = current.icon;
+  const isWeight = step >= questions.length;
+  const current = questions[Math.min(step, questions.length - 1)];
+  const Icon = isWeight ? Scale : current.icon;
   const selected = answers[current.key];
-  const isLast = step === questions.length - 1;
+  const isLast = isWeight;
+  const kilos = Number(String(weight).replace(',', '.'));
 
   const choose = (value: string) => {
     setError('');
@@ -198,7 +202,7 @@ export default function Onboarding({
     }
 
     setError('');
-    setStep((value) => Math.min(questions.length - 1, value + 1));
+    setStep((value) => Math.min(questions.length, value + 1));
   };
 
   const back = () => {
@@ -225,6 +229,10 @@ export default function Onboarding({
       setError('Completa todas las preguntas antes de continuar.');
       return;
     }
+    if (!kilos || kilos < 40 || kilos > 180) {
+      setError('Escribe tu peso en kilos, entre 40 y 180.');
+      return;
+    }
 
     setSaving(true);
     setError('');
@@ -244,6 +252,7 @@ export default function Onboarding({
             priority: answers.priority,
             style: answers.style,
           },
+          weight_kg: kilos,
         }),
       });
 
@@ -281,7 +290,7 @@ export default function Onboarding({
         )}
 
         <div className="mb-8 flex gap-1.5">
-          {questions.map((_, index) => (
+          {Array.from({ length: questions.length + 1 }).map((_, index) => (
             <div
               key={index}
               className={`h-1 flex-1 rounded-full ${
@@ -301,11 +310,13 @@ export default function Onboarding({
           </p>
 
           <h1 className="text-3xl font-black tracking-tight">
-            {current.title}
+            {isWeight ? '¿Cuánto pesas?' : current.title}
           </h1>
 
           <p className="mt-4 text-sm leading-6 text-neutral-400">
-            {current.text}
+            {isWeight
+              ? 'Con este número se calcula tu dieta. No se usa el peso de otra cuenta.'
+              : current.text}
           </p>
 
           {step === 0 && (
@@ -319,6 +330,18 @@ export default function Onboarding({
             </div>
           )}
 
+          {isWeight ? (
+            <div className="mt-6">
+              <label className="text-xs font-bold uppercase tracking-wider text-neutral-500">Peso en kg</label>
+              <input
+                inputMode="decimal"
+                value={weight}
+                onChange={(e) => { setError(''); setWeight(e.target.value); }}
+                placeholder="Ej. 82.5"
+                className="mt-2 w-full rounded-2xl border border-neutral-800 bg-neutral-950 p-4 text-lg font-black text-white"
+              />
+            </div>
+          ) : (
           <div className="mt-6 space-y-2.5">
             {current.options.map((option) => {
               const isSelected = selected === option.value;
@@ -366,6 +389,7 @@ export default function Onboarding({
               );
             })}
           </div>
+          )}
 
           {error && (
             <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs leading-5 text-red-300">
@@ -409,7 +433,7 @@ export default function Onboarding({
         </div>
 
         <p className="mt-5 text-center text-[11px] text-neutral-600">
-          Paso {step + 1} de {questions.length}
+          Paso {step + 1} de {questions.length + 1}
         </p>
       </div>
     </div>

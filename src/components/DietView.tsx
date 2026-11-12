@@ -140,7 +140,7 @@ export default function DietView({ user }: { user: any }) {
     <div className="max-w-md mx-auto px-4 pt-6 pb-28 text-neutral-100">
       <p className="text-lime-400 text-xs uppercase tracking-[0.2em] font-semibold">Nutricion</p>
       <h1 className="text-2xl font-bold mt-1 flex items-center gap-2">
-        <Utensils size={22} className="text-lime-400" /> Dieta A/B/C
+        <Utensils size={22} className="text-lime-400" /> Dieta
       </h1>
       {error && <div className="mt-4 text-sm bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-3">{error}</div>}
       {flash && <div className="mt-4 text-sm bg-lime-400 text-neutral-950 font-semibold rounded-xl p-3">{flash}</div>}
@@ -222,7 +222,7 @@ export default function DietView({ user }: { user: any }) {
             {[
               { n: 3, title: '3 tomas', desc: 'Desayuno, comida y cena. Platos más grandes.' },
               { n: 4, title: '4 tomas', desc: 'Lo mismo + un snack entre horas.' },
-              { n: 5, title: '5 tomas', desc: 'Snack + algo peri-entreno los días A/B/C.' },
+              { n: 5, title: '5 tomas', desc: 'Snack + algo peri-entreno los días que hay entreno.' },
             ].map((opt) => (
               <button key={opt.n} disabled={saving} onClick={() => saveProfile({ meals_per_day: opt.n })}
                 className={`text-left w-full rounded-xl p-3 border mb-2 ${Number(profile.meals_per_day) === opt.n ? 'border-lime-400 bg-lime-400/10' : 'border-neutral-800 bg-neutral-900'}`}>
@@ -231,6 +231,10 @@ export default function DietView({ user }: { user: any }) {
               </button>
             ))}
           </div>
+          {!profile.weight_kg && (
+            <p className="text-xs text-amber-200">Pon tu peso. Si no, la semana no es tuya.</p>
+          )}
+          <p className="text-xs text-neutral-500">Estas calorías son de tu peso, no de otra cuenta.</p>
           <input type="number" defaultValue={profile.weight_kg || ''} placeholder="Peso kg"
             className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3"
             onBlur={(e) => { if (e.target.value) saveProfile({ weight_kg: Number(e.target.value) }); }} />

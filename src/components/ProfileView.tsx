@@ -24,7 +24,7 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [submittingPassword, setSubmittingPassword] = useState(false);
 
-  const [adminUsers, setAdminUsers] = useState<{id:string;name:string;role:string}[]>([]);
+  const [adminUsers, setAdminUsers] = useState<{id:string;name:string;role:string;test_line?:string;use_line?:string}[]>([]);
   const loadUsers = async () => {
     const res = await apiFetch('/api/auth/admin/users');
     const data = await res.json().catch(() => ({}));
@@ -321,6 +321,8 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-white truncate">{u.name}</p>
                   <p className="text-[10px] uppercase text-neutral-500">{u.role}</p>
+                  <p className="text-[11px] text-neutral-200 leading-4">{u.test_line}</p>
+                  <p className="text-[11px] text-neutral-500 leading-4">{u.use_line}</p>
                 </div>
                 {u.id !== user.id && (
                   <div className="flex gap-1">
