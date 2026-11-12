@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Timer, Dumbbell, ChevronDown, ChevronUp, Loader, AlertTriangle, Info, Trash2, MessageCircle, Pencil, Plus, Check, X } from 'lucide-react';
 import { WorkoutLog, WorkoutSet, Exercise } from '../types';
 import { apiFetch } from '../lib/api';
+import { isTimedByName } from '../lib/measure';
 
 interface HistoryListProps {
   user: {
@@ -114,7 +115,7 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
       exerciseLines.push(`• ${name}: ${series}`);
     });
     const volume = sets.reduce((sum, s) => {
-      if (s.is_warmup || s.exercise_name?.toLowerCase() === 'plancha') return sum;
+      if (s.is_warmup || isTimedByName(s.exercise_name)) return sum;
       return sum + (Number(s.weight_kg) || 0) * (Number(s.reps) || 0);
     }, 0);
     const lines = [
@@ -211,7 +212,7 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
     }
   };
 
-  const isPlank = (name?: string | null) => (name || '').trim().toLowerCase() === 'plancha';
+  const isPlank = (name?: string | null) => isTimedByName(name);
 
   const addSet = async (workout: WorkoutLog) => {
     if (!addExerciseId) {
@@ -260,7 +261,7 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
   const calculateTotalVolume = (sets: WorkoutSet[] | undefined) => {
     if (!sets) return 0;
     return sets.reduce((sum, s) => {
-      const isTimed = s.exercise_name?.trim().toLowerCase() === 'plancha';
+      const isTimed = isTimedByName(s.exercise_name);
       if (s.is_warmup || isTimed) return sum;
       return sum + s.weight_kg * s.reps;
     }, 0);
@@ -416,7 +417,7 @@ export default function HistoryList({ user, onOpenExerciseInfo }: HistoryListPro
                                             {s.is_warmup ? 'Calentamiento' : `Serie ${s.set_number}`}
                                           </span>
                                           <span className="text-white font-bold">
-                                            {s.exercise_name?.trim().toLowerCase() === 'plancha'
+                                            {isTimedByName(s.exercise_name)
                                               ? `${s.reps}s`
                                               : `${s.weight_kg}kg × ${s.reps} ${s.rir !== null ? `(RIR ${s.rir})` : ''}`}
                                           </span>

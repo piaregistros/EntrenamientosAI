@@ -5,6 +5,7 @@ import { Play, Dumbbell, Timer, ArrowRight, ArrowLeft, Plus, Check, Trash2, Refr
 import { motion, AnimatePresence } from 'motion/react';
 import { Exercise, Routine, RoutineExercise, WorkoutLog, WorkoutSet, ExerciseSubstitution } from '../types';
 import { apiFetch } from '../lib/api';
+import { isTimedExercise, rememberMeasure, fmtKg } from '../lib/measure';
 import { rebuildSessionExercises } from '../lib/rebuildSession';
 
 interface WorkoutActiveProps {
@@ -16,11 +17,7 @@ interface WorkoutActiveProps {
   onOpenExerciseInfo?: (exercise: any) => void;
 }
 
-function isTimedExercise(exercise: any) {
-  return String(exercise?.exercise?.name || exercise?.name || "")
-    .trim()
-    .toLowerCase() === "plancha";
-}
+// Fase 6: el tipo de medida (reps / time / bodyweight) viene del servidor (src/lib/measure.ts).
 
 // Peso inicial cuando no hay historial ni recomendación: nunca un valor inventado.
 // Peso corporal puro / ejercicios por tiempo -> 0; resto -> vacío (el usuario elige).
@@ -341,6 +338,7 @@ export default function WorkoutActive({
       const recsRes = await apiFetch(`/api/routines/${routineId}/recommendations?user_id=${encodeURIComponent(user.id)}`);
       if (recsRes.ok) {
         const recsData = await recsRes.json();
+        (recsData.recommendations || []).forEach((r: any) => rememberMeasure(r.exercise_id, r.measure_type));
         setRecommendations(recsData.recommendations || []);
       }
     } catch (err: any) {
@@ -525,13 +523,12 @@ export default function WorkoutActive({
       setInputWeight(remembered);
       return;
     }
-    if (planned && planned.next_weight_kg != null && !isTimedExercise(activeExerciseItem)) {
-      const w = deload ? Math.round(planned.next_weight_kg * 0.9 / 2.5) * 2.5 : planned.next_weight_kg;
-      setInputWeight(String(w));
-      setInputReps(String(activeExerciseItem.target_rep_min || 8));
-      setError(planned.reason || null);
-    } else if (rec) {
-      // El backend usa recommended_rep_target.
+    // Fase 6: la recomendación del servidor es la fuente de verdad (misma doble progresión que
+    // al cerrar el entreno). Las cargas guardadas en el navegador solo valen si no hay recomendación.
+    const increment = Number(rec?.increment_kg ?? activeExercise.weight_increment_kg ?? 0) || 0;
+    const deloadWeight = (w: number) =>
+      increment > 0 ? Math.round((w * 0.9) / increment) * increment : Math.round(w * 0.9 * 10) / 10;
+    if (rec) {
       // recommended_weight_kg puede ser null cuando no existe histórico.
       const recommendedWeight = rec.recommended_weight_kg;
       const recommendedReps =
@@ -539,17 +536,24 @@ export default function WorkoutActive({
         rec.recommended_reps ??
         activeExerciseItem.target_rep_min;
 
-      setInputWeight(
-        recommendedWeight != null
-          ? String(recommendedWeight)
-          : defaultStartWeight(activeExerciseItem)
-      );
+      if (recommendedWeight != null) {
+        const w = deload && rec.kind !== 'deload' && rec.recommendation !== 'deload' && recommendedWeight > 0
+          ? deloadWeight(Number(recommendedWeight))
+          : Number(recommendedWeight);
+        setInputWeight(String(w));
+      } else {
+        setInputWeight(defaultStartWeight(activeExerciseItem));
+      }
 
       setInputReps(
         recommendedReps != null
           ? String(recommendedReps)
           : '1'
       );
+    } else if (planned && planned.next_weight_kg != null && !isTimedExercise(activeExerciseItem)) {
+      const w = deload ? deloadWeight(Number(planned.next_weight_kg)) : planned.next_weight_kg;
+      setInputWeight(String(w));
+      setInputReps(String(planned.next_reps || activeExerciseItem.target_rep_min || 8));
     } else if (lastPerf && lastPerf.sets.length > 0) {
       const lastWeight = lastPerf.sets[0].weight_kg;
       const lastReps = lastPerf.sets[0].reps;
@@ -811,6 +815,8 @@ export default function WorkoutActive({
 
   const activeExerciseSets = loggedSets.filter(s => s.exercise_id === activeExercise?.id);
   const activeRec = recommendations.find(r => r.exercise_id === activeExercise?.id);
+  // Paso de los botones +/-: el efectivo del servidor (según equipo), luego el del ejercicio, luego 2,5 kg.
+  const weightStep = Number(activeRec?.increment_kg) > 0 ? Number(activeRec.increment_kg) : (Number(activeExercise?.weight_increment_kg) > 0 ? Number(activeExercise.weight_increment_kg) : 2.5);
 
   return (
     <div id="active-workout-panel" className="min-h-screen w-full bg-neutral-950 text-neutral-100 pb-8 max-w-md mx-auto select-none relative">
@@ -1005,12 +1011,26 @@ export default function WorkoutActive({
                 <div>
                   <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">Progresión Recomendada</h4>
                   <p className="text-[11px] text-lime-400 font-bold mt-1">
-                    {isTimedExercise(activeExerciseItem)
-                      ? `Intenta aguantar ${activeRec.recommended_rep_target} segundos en plancha`
-                      : activeRec.recommended_weight_kg == null
-                        ? `Sin historial: elige un peso cómodo y apunta a ${activeRec.recommended_rep_target ?? activeExerciseItem.target_rep_min} reps`
-                        : `Usa ${activeRec.recommended_weight_kg} kg · apunta a ${activeRec.recommended_rep_target} reps`
-                    }
+                    {(() => {
+                      const timed = isTimedExercise(activeExerciseItem) || activeRec.measure_type === 'time';
+                      const unit = timed ? 's' : ' reps';
+                      const reps = activeRec.recommended_rep_target ?? activeExerciseItem.target_rep_min;
+                      const w = activeRec.recommended_weight_kg;
+                      const kind = activeRec.recommendation;
+                      if (kind === 'start' || (w == null && !timed)) {
+                        return `Sin historial: elige un peso cómodo y apunta a ${reps}${unit}`;
+                      }
+                      if (timed && !(w > 0)) {
+                        return kind === 'add_reps'
+                          ? `Intenta aguantar ${reps} s por serie`
+                          : `Objetivo: ${reps} s por serie`;
+                      }
+                      const load = w > 0 ? `${fmtKg(w)} kg` : 'tu peso corporal';
+                      if (kind === 'increase_weight') return `Sube a ${load} · vuelve a ${reps}${unit}`;
+                      if (kind === 'deload') return `Baja a ${load} · ${reps}${unit}`;
+                      if (kind === 'add_reps') return `Mantén ${load} · apunta a ${reps}${unit} (+1 por serie)`;
+                      return `Usa ${load} · apunta a ${reps}${unit}`;
+                    })()}
                   </p>
                   <p className="text-[10px] text-neutral-400 mt-1 leading-relaxed">{activeRec.reason}</p>
                 </div>
@@ -1033,7 +1053,7 @@ export default function WorkoutActive({
                     <button
                       id="btn-weight-minus"
                       type="button"
-                      onClick={() => adjustWeight(-activeExercise.weight_increment_kg)}
+                      onClick={() => adjustWeight(-weightStep)}
                       className="w-8 h-8 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white flex items-center justify-center font-bold text-sm border border-neutral-800 active:bg-neutral-850"
                       style={{ minHeight: '32px' }}
                     >
@@ -1053,7 +1073,7 @@ export default function WorkoutActive({
                     <button
                       id="btn-weight-plus"
                       type="button"
-                      onClick={() => adjustWeight(activeExercise.weight_increment_kg)}
+                      onClick={() => adjustWeight(weightStep)}
                       className="w-8 h-8 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white flex items-center justify-center font-bold text-sm border border-neutral-800 active:bg-neutral-850"
                       style={{ minHeight: '32px' }}
                     >
@@ -1065,7 +1085,7 @@ export default function WorkoutActive({
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Peso (kg)</label>
                   <div className="flex items-center justify-center h-10 bg-neutral-950/40 border border-neutral-850 rounded-xl text-neutral-500 text-xs font-bold">
-                    Plancha (0 kg)
+                    Sin carga (0 kg)
                   </div>
                 </div>
               )}

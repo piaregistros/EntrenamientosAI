@@ -5,6 +5,7 @@ import { Routine, WorkoutLog, BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
 import HomeProgress from './HomeProgress';
 import ActivitiesPanel from './ActivitiesPanel';
+import { isTimedByName } from '../lib/measure';
 
 interface DashboardProps {
   user: any;
@@ -429,8 +430,7 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
                     firstSet?.exercise_name ||
                     'Ejercicio';
 
-                  const isTimedExercise =
-                    name.trim().toLowerCase() === 'plancha';
+                  const isTimedExercise = isTimedByName(name);
 
                   return (
                     <div key={exerciseId} className="flex justify-between items-center bg-neutral-950/40 p-2.5 rounded-xl border border-neutral-800/40">
@@ -511,7 +511,7 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-bold text-lime-400">
-                        {re.exercise?.name?.trim().toLowerCase() === 'plancha'
+                        {isTimedByName(re.exercise?.name)
                           ? `${re.target_sets} × ${re.target_rep_min}-${re.target_rep_max}s`
                           : `${re.target_sets} × ${re.target_rep_min}-${re.target_rep_max}`
                         }
