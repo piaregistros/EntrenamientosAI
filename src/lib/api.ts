@@ -33,7 +33,18 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   updatedInit.headers = headers;
   updatedInit.credentials = 'include';
 
-  const response = await fetch(input, updatedInit);
+  let response = await fetch(input, updatedInit);
+
+  // Resiliencia: una lectura (GET) que devuelve 5xx suele ser un fallo transitorio
+  // (p. ej. base de datos ocupada). Se reintenta hasta 2 veces antes de rendirse.
+  // Solo GET: nunca se repiten escrituras.
+  if (method === 'GET') {
+    for (let attempt = 0; attempt < 2 && response.status >= 500; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+      response = await fetch(input, updatedInit);
+    }
+  }
+
   if (response.status === 401) {
     window.dispatchEvent(new Event('unauthorized'));
   }
