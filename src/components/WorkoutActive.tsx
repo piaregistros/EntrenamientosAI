@@ -5,6 +5,7 @@ import { Play, Dumbbell, Timer, ArrowRight, ArrowLeft, Plus, Check, Trash2, Refr
 import { motion, AnimatePresence } from 'motion/react';
 import { Exercise, Routine, RoutineExercise, WorkoutLog, WorkoutSet, ExerciseSubstitution } from '../types';
 import { apiFetch } from '../lib/api';
+import { rebuildSessionExercises } from '../lib/rebuildSession';
 
 interface WorkoutActiveProps {
   user: any;
@@ -289,12 +290,21 @@ export default function WorkoutActive({
           };
         });
 
-      setExercises(loadedExercises);
+      // Reconstruir la sesión tal y como estaba: sustituciones y ejercicios
+      // extra se guardan en el servidor (antes solo vivían en memoria).
+      const restoredExercises = rebuildSessionExercises(
+        loadedExercises,
+        startData.substitutions,
+        startData.extra_exercises,
+        Array.isArray(startData.sets) ? startData.sets : []
+      );
+      setExercises(restoredExercises.items);
+      setSubstitutionsMap(restoredExercises.substitutionsMap);
 
       // Recuperar exactamente el ejercicio que estaba activo antes
       // de refrescar o cambiar de dispositivo.
       if (startData.current_exercise_id) {
-        const restoredIndex = loadedExercises.findIndex(
+        const restoredIndex = restoredExercises.items.findIndex(
           (item: any) =>
             item.exercise?.id === startData.current_exercise_id ||
             item.exercise_id === startData.current_exercise_id ||
@@ -384,7 +394,7 @@ export default function WorkoutActive({
     }
   };
 
-  const addExtraExercise = () => {
+  const addExtraExercise = async () => {
     const ex = catalog.find((e) => e.id === extraId);
     if (!ex) {
       setError('Elige un ejercicio.');
@@ -396,6 +406,38 @@ export default function WorkoutActive({
       setShowAddExtra(false);
       return;
     }
+    if (!workoutLog?.id) {
+      setError('La sesión todavía no está lista.');
+      return;
+    }
+
+    // Se guarda primero en el servidor: si falla, no se añade a medias y
+    // el usuario ve el error (antes se perdía en silencio al recargar).
+    try {
+      const res = await apiFetch(
+        `/api/workouts/${encodeURIComponent(workoutLog.id)}/extra-exercises?user_id=${encodeURIComponent(user.id)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            exercise_id: ex.id,
+            target_sets: 3,
+            target_rep_min: 8,
+            target_rep_max: 12,
+            target_rir: 2,
+            rest_seconds: 90,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const fail = await res.json().catch(() => ({}));
+        throw new Error(typeof fail.detail === 'string' ? fail.detail : 'No se pudo añadir el ejercicio.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'No se pudo añadir el ejercicio.');
+      return;
+    }
+
     const item = {
       id: 'extra-' + ex.id,
       exercise_id: ex.id,
@@ -686,7 +728,7 @@ export default function WorkoutActive({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Conflicto al sustituir ejercicio.');
+        throw new Error((typeof data.detail === 'string' && data.detail) || data.error || 'Conflicto al sustituir ejercicio.');
       }
 
       // Success! Update active exercises list locally
@@ -708,7 +750,7 @@ export default function WorkoutActive({
       // Update substitutions tracking map
       setSubstitutionsMap({
         ...substitutionsMap,
-        [activeExercise.id]: substitutedExItem
+        [alternativeExerciseId]: substitutedExItem
       });
 
       setShowSubModal(false);
