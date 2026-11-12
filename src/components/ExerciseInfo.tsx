@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Info, Dumbbell, ShieldAlert, Award, Play } from 'lucide-react';
+import { X, Info, Dumbbell, ShieldAlert, Award, Play, ExternalLink } from 'lucide-react';
 import { Exercise } from '../types';
+import { apiFetch } from '../lib/api';
 
 interface ExerciseInfoProps {
   exercise: Exercise | null;
@@ -55,7 +56,42 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
     };
   }, [isOpen, onClose]);
 
+  // La ficha completa (pasos, claves, errores, vídeo, músculos) se pide al servidor al abrir,
+  // así no depende de qué objeto de ejercicio pase quien abre el modal.
+  const [detail, setDetail] = useState<Exercise | null>(null);
+  const [loadState, setLoadState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const exerciseId = exercise?.id;
+
+  useEffect(() => {
+    if (!isOpen || !exerciseId) return;
+    let cancelled = false;
+    setDetail(null);
+    setLoadState('loading');
+    setActiveTab('ejecucion');
+    apiFetch(`/api/exercises/${encodeURIComponent(exerciseId)}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((data) => {
+        if (!cancelled) {
+          setDetail(data);
+          setLoadState('ok');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadState('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, exerciseId]);
+
   if (!exercise) return null;
+
+  const ex: Exercise = { ...exercise, ...(detail || {}) };
+  const embedUrl = getYoutubeEmbedUrl(ex.video_url);
+  const watchUrl = ex.video_url && ex.video_url.startsWith('http') ? ex.video_url : null;
+  const youtubeSearchUrl =
+    'https://www.youtube.com/results?search_query=' + encodeURIComponent(`${ex.name} técnica`);
+  const secondaryMuscles = Array.isArray(ex.secondary_muscles) ? ex.secondary_muscles : [];
 
   // Format progression types for display
   const formatProgression = (type: string) => {
@@ -109,10 +145,10 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
                 </div>
                 <div>
                   <h3 className="font-bold text-lg text-white leading-tight">
-                    {exercise.name}
+                    {ex.name}
                   </h3>
                   <span className="text-xs text-neutral-400 font-medium">
-                    {exercise.target_muscle} • {exercise.equipment}
+                    {ex.target_muscle} • {ex.equipment}
                   </span>
                 </div>
               </div>
@@ -154,31 +190,75 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
               {/* TAB 1: EJECUCIÓN */}
               {activeTab === 'ejecucion' && (
                 <div className="space-y-5">
-                  {/* Video block (Only shown if video_url exists) */}
-                  {getYoutubeEmbedUrl(exercise.video_url) ? (
-                    <div className="relative aspect-video rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950">
-                      <iframe
-                        src={getYoutubeEmbedUrl(exercise.video_url)!}
-                        title={`Video de demostración para ${exercise.name}`}
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowFullScreen
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : null}
+                  {loadState === 'loading' && (
+                    <p className="text-xs text-neutral-500">Cargando ficha completa…</p>
+                  )}
+                  {loadState === 'error' && (
+                    <p className="text-xs text-amber-400/90">
+                      No se pudo cargar la ficha completa; se muestran los datos disponibles.
+                    </p>
+                  )}
 
-                  {/* Muscles and general category info */}
+                  {/* Vídeo (viene de la API: exercise_media) */}
+                  {embedUrl ? (
+                    <div className="space-y-2">
+                      <div className="relative aspect-video rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950">
+                        <iframe
+                          src={embedUrl}
+                          title={`Video de demostración para ${ex.name}`}
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      {watchUrl && (
+                        <a
+                          href={watchUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-lime-400"
+                        >
+                          <ExternalLink size={12} /> Abrir en YouTube
+                        </a>
+                      )}
+                    </div>
+                  ) : loadState === 'loading' ? null : (
+                    <div className="p-4 bg-neutral-950/40 border border-dashed border-neutral-700 rounded-xl text-center space-y-2">
+                      <Play size={20} className="mx-auto text-neutral-500" />
+                      <p className="text-sm text-neutral-300">Todavía no hay un vídeo para este ejercicio.</p>
+                      <a
+                        href={youtubeSearchUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-lime-400 hover:underline"
+                      >
+                        <ExternalLink size={12} /> Buscar la técnica en YouTube
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Músculos y equipo */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 bg-neutral-950/50 border border-neutral-800/60 rounded-xl">
-                      <span className="block text-xs text-neutral-400 font-medium">Músculo Objetivo</span>
-                      <span className="text-sm font-semibold text-white">{exercise.target_muscle}</span>
+                      <span className="block text-xs text-neutral-400 font-medium">Músculo objetivo</span>
+                      <span className="text-sm font-semibold text-white">{ex.target_muscle || '—'}</span>
                     </div>
                     <div className="p-3 bg-neutral-950/50 border border-neutral-800/60 rounded-xl">
-                      <span className="block text-xs text-neutral-400 font-medium">Categoría</span>
-                      <span className="text-sm font-semibold text-white capitalize">{exercise.category}</span>
+                      <span className="block text-xs text-neutral-400 font-medium">Equipo</span>
+                      <span className="text-sm font-semibold text-white">{ex.equipment || '—'}</span>
                     </div>
                   </div>
+                  {secondaryMuscles.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs text-neutral-400 font-medium">Secundarios:</span>
+                      {secondaryMuscles.map((m) => (
+                        <span key={m} className="px-2 py-0.5 text-xs rounded-full bg-neutral-800 text-neutral-300 capitalize">
+                          {m}
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
                   {/* General Instructions */}
                   <div className="space-y-2">
@@ -186,7 +266,7 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
                       <Info size={14} /> Instrucciones
                     </h4>
                     <p className="text-sm text-neutral-300 leading-relaxed bg-neutral-950/30 p-3.5 rounded-xl border border-neutral-800/40">
-                      {exercise.instructions || 'No hay instrucciones generales registradas para este ejercicio.'}
+                      {ex.instructions || 'No hay instrucciones generales registradas para este ejercicio.'}
                     </p>
                   </div>
 
@@ -195,9 +275,9 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
                     <h4 className="text-sm font-bold text-white uppercase tracking-wider text-lime-400/90">
                       Pasos de ejecución
                     </h4>
-                    {exercise.steps && exercise.steps.length > 0 ? (
+                    {ex.steps && ex.steps.length > 0 ? (
                       <ol className="space-y-2.5">
-                        {exercise.steps.map((step, index) => (
+                        {ex.steps.map((step, index) => (
                           <li key={index} className="flex gap-3 text-sm leading-relaxed">
                             <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-lime-500/10 text-lime-400 text-xs font-bold">
                               {index + 1}
@@ -208,7 +288,7 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
                       </ol>
                     ) : (
                       <p className="text-xs text-neutral-400 italic">
-                        La guía de pasos numerada se cargará en la versión enriquecida.
+                        Este ejercicio todavía no tiene pasos detallados.
                       </p>
                     )}
                   </div>
@@ -221,11 +301,11 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
                   {/* Technical cues */}
                   <div className="space-y-2">
                     <h4 className="text-sm font-bold text-white flex items-center gap-1.5 uppercase tracking-wider text-teal-400">
-                      <Award size={14} /> Consejos Técnicos
+                      <Award size={14} /> Claves técnicas
                     </h4>
-                    {exercise.technical_cues && exercise.technical_cues.length > 0 ? (
+                    {ex.technical_cues && ex.technical_cues.length > 0 ? (
                       <ul className="space-y-2">
-                        {exercise.technical_cues.map((cue, i) => (
+                        {ex.technical_cues.map((cue, i) => (
                           <li key={i} className="flex items-start gap-2 text-sm text-neutral-300">
                             <span className="text-teal-400 mt-1">•</span>
                             <span>{cue}</span>
@@ -234,7 +314,7 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
                       </ul>
                     ) : (
                       <p className="text-xs text-neutral-400 italic">
-                        Los consejos de optimización técnica se añadirán próximamente.
+                        Este ejercicio todavía no tiene claves técnicas.
                       </p>
                     )}
                   </div>
@@ -242,11 +322,11 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
                   {/* Common mistakes */}
                   <div className="space-y-2">
                     <h4 className="text-sm font-bold text-white flex items-center gap-1.5 uppercase tracking-wider text-red-400">
-                      <ShieldAlert size={14} /> Errores Frecuentes
+                      <ShieldAlert size={14} /> Errores comunes
                     </h4>
-                    {exercise.common_mistakes && exercise.common_mistakes.length > 0 ? (
+                    {ex.common_mistakes && ex.common_mistakes.length > 0 ? (
                       <ul className="space-y-2">
-                        {exercise.common_mistakes.map((mistake, i) => (
+                        {ex.common_mistakes.map((mistake, i) => (
                           <li key={i} className="flex items-start gap-2 text-sm text-neutral-300">
                             <span className="text-red-400 mt-1">✗</span>
                             <span>{mistake}</span>
@@ -255,31 +335,31 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
                       </ul>
                     ) : (
                       <p className="text-xs text-neutral-400 italic">
-                        Los errores frecuentes de ejecución se añadirán próximamente.
+                        Este ejercicio todavía no tiene errores frecuentes registrados.
                       </p>
                     )}
                   </div>
 
                   {/* Safety Notes */}
-                  {exercise.safety_notes && (
+                  {ex.safety_notes && (
                     <div className="p-3.5 bg-yellow-500/5 border border-yellow-500/20 rounded-xl space-y-1">
                       <span className="text-xs font-bold text-yellow-500 uppercase tracking-wider block">
                         Advertencias de Seguridad
                       </span>
                       <p className="text-sm text-neutral-300 leading-relaxed">
-                        {exercise.safety_notes}
+                        {ex.safety_notes}
                       </p>
                     </div>
                   )}
 
                   {/* Contraindications */}
-                  {exercise.contraindications && (
+                  {ex.contraindications && (
                     <div className="p-3.5 bg-red-500/5 border border-red-500/20 rounded-xl space-y-1">
                       <span className="text-xs font-bold text-red-400 uppercase tracking-wider block">
                         Contraindicaciones
                       </span>
                       <p className="text-sm text-neutral-300 leading-relaxed">
-                        {exercise.contraindications}
+                        {ex.contraindications}
                       </p>
                     </div>
                   )}
@@ -292,26 +372,26 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
                   <div className="divide-y divide-neutral-800 bg-neutral-950/50 border border-neutral-800 rounded-xl overflow-hidden">
                     <div className="flex justify-between p-3.5 text-sm">
                       <span className="text-neutral-400">Equipamiento</span>
-                      <span className="font-semibold text-white">{exercise.equipment}</span>
+                      <span className="font-semibold text-white">{ex.equipment}</span>
                     </div>
                     <div className="flex justify-between p-3.5 text-sm">
                       <span className="text-neutral-400">Categoría</span>
-                      <span className="font-semibold text-white capitalize">{exercise.category}</span>
+                      <span className="font-semibold text-white capitalize">{ex.category}</span>
                     </div>
                     <div className="flex justify-between p-3.5 text-sm">
                       <span className="text-neutral-400">Incremento mínimo</span>
-                      <span className="font-semibold text-white">{exercise.weight_increment_kg} kg</span>
+                      <span className="font-semibold text-white">{ex.weight_increment_kg} kg</span>
                     </div>
                     <div className="flex justify-between p-3.5 text-sm">
                       <span className="text-neutral-400">Sistema de Progresión</span>
                       <span className="font-semibold text-white">
-                        {formatProgression(exercise.progression_type)}
+                        {formatProgression(ex.progression_type)}
                       </span>
                     </div>
                     <div className="flex justify-between p-3.5 text-sm">
                       <span className="text-neutral-400">Progresión por Reps</span>
-                      <span className={`font-semibold ${exercise.rep_progression_enabled ? 'text-lime-400' : 'text-neutral-400'}`}>
-                        {exercise.rep_progression_enabled ? 'Activado' : 'Desactivado'}
+                      <span className={`font-semibold ${ex.rep_progression_enabled ? 'text-lime-400' : 'text-neutral-400'}`}>
+                        {ex.rep_progression_enabled ? 'Activado' : 'Desactivado'}
                       </span>
                     </div>
                   </div>

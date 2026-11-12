@@ -52,30 +52,9 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
+  // El modal pide la ficha completa (pasos, claves, errores, vídeo...) a /api/exercises/{id}.
   const handleOpenExerciseInfo = (exercise: Exercise) => {
-    const normalizeExerciseName = (value: string) =>
-      value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
-    const videoMap: Record<string, string> = {
-      'prensa de piernas': 'https://www.youtube-nocookie.com/embed/P8TfK9wmFVo',
-      'press banca plano': 'https://www.youtube-nocookie.com/embed/CayG6UYqL8g',
-      'remo con pecho apoyado': 'https://www.youtube-nocookie.com/embed/0UBRfiO4zDs',
-      'curl femoral': 'https://www.youtube-nocookie.com/embed/_2Kd0d-JEUM',
-      'elevaciones laterales en maquina': 'https://www.youtube-nocookie.com/embed/0o07iGKUarI',
-      'curl de biceps en maquina': 'https://www.youtube-nocookie.com/embed/Ja6ZlIDONac',
-      'extension de triceps en polea': 'https://www.youtube-nocookie.com/embed/6Fzep104f0s',
-      'press hombro mancuerna neutro': 'https://www.youtube-nocookie.com/embed/y03eDnIFfK8',
-      'jalon neutro': 'https://www.youtube-nocookie.com/embed/4y-GyEQ74Hk',
-      'hip thrust': 'https://www.youtube-nocookie.com/embed/U5U6JNIiZ_Q',
-      'face pull': 'https://www.youtube-nocookie.com/embed/eTCBSFlCJ_s',
-      'press inclinado mancuerna': 'https://www.youtube-nocookie.com/embed/0f6-uCUKqgA',
-      'bulgara': 'https://www.youtube-nocookie.com/embed/bwhl_9jN_3o',
-      'remo unilateral': 'https://www.youtube-nocookie.com/embed/IOy2k0Cb6Vo?start=7',
-      'zancadas': 'https://www.youtube-nocookie.com/embed/eFWCn5iEbTU',
-      'plancha': 'https://www.youtube-nocookie.com/embed/mwlp75MS6Rg',
-    };
-    const normalizedName = normalizeExerciseName(exercise.name || '');
-    const videoUrl = exercise.video_url || videoMap[normalizedName] || null;
-    setSelectedExercise({ ...exercise, video_url: videoUrl });
+    setSelectedExercise(exercise);
     setIsExerciseInfoOpen(true);
   };
 

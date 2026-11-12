@@ -23,7 +23,23 @@ export interface Exercise {
   steps?: string[];
   common_mistakes?: string[];
   technical_cues?: string[];
-  video_url?: string;
+  video_url?: string | null;
+  secondary_muscles?: string[];
+  movement_pattern?: string;
+  exercise_type?: string;
+  difficulty?: string;
+  laterality?: string;
+  measure_type?: string;
+  media?: ExerciseMedia[];
+}
+
+export interface ExerciseMedia {
+  id: string;
+  type: 'video' | 'image';
+  url: string;
+  source: string;
+  title?: string | null;
+  is_primary: boolean;
 }
 
 export interface Routine {
