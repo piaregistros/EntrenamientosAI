@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Copias de seguridad temporales (siguen en el historial de git)
+*.backup-*
+*.pre-*
+*.bak
