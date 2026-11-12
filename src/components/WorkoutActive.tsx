@@ -21,6 +21,79 @@ function isTimedExercise(exercise: any) {
     .toLowerCase() === "plancha";
 }
 
+// Reconstruye la lista de ejercicios de una sesión reanudada a partir de lo que
+// guarda el servidor: sustituciones, extras y (por compatibilidad con sesiones
+// anteriores a esta versión) extras deducidos de las series ya registradas.
+function rebuildSessionExercises(
+  routineItems: any[],
+  substitutions: any,
+  extraExercises: any,
+  sets: any[]
+): { items: any[]; substitutionsMap: Record<string, any> } {
+  const substitutionsMap: Record<string, any> = {};
+  const subList = Array.isArray(substitutions) ? substitutions : [];
+
+  let items = routineItems.map((item: any) => {
+    const originalId = item.exercise?.id ?? item.exercise_id;
+    const sub = subList.find((x: any) => x.original_exercise_id === originalId);
+    if (!sub || !sub.substitute_exercise) return item;
+    const substituted = {
+      ...item,
+      exercise_id: sub.substitute_exercise_id,
+      exercise: sub.substitute_exercise,
+      last_performance: null,
+    };
+    // La marca amarilla de la pestaña se consulta por el ejercicio que se hace ahora.
+    substitutionsMap[sub.substitute_exercise_id] = substituted;
+    return substituted;
+  });
+
+  const knownIds = new Set(items.map((i: any) => i.exercise?.id ?? i.exercise_id));
+  const extraList = Array.isArray(extraExercises) ? extraExercises : [];
+  for (const extra of extraList) {
+    if (!extra?.exercise || knownIds.has(extra.exercise_id)) continue;
+    knownIds.add(extra.exercise_id);
+    items.push({
+      id: 'extra-' + extra.exercise_id,
+      exercise_id: extra.exercise_id,
+      order: items.length + 1,
+      target_sets: extra.target_sets ?? 3,
+      target_rep_min: extra.target_rep_min ?? 8,
+      target_rep_max: extra.target_rep_max ?? 12,
+      target_rir: extra.target_rir ?? 2,
+      rest_seconds: extra.rest_seconds ?? 90,
+      is_optional: true,
+      exercise: extra.exercise,
+    });
+  }
+
+  // Sesiones antiguas: extras que solo existen como series registradas.
+  for (const s of sets) {
+    if (!s?.exercise_id || knownIds.has(s.exercise_id)) continue;
+    knownIds.add(s.exercise_id);
+    items.push({
+      id: 'extra-' + s.exercise_id,
+      exercise_id: s.exercise_id,
+      order: items.length + 1,
+      target_sets: 3,
+      target_rep_min: 8,
+      target_rep_max: 12,
+      target_rir: 2,
+      rest_seconds: 90,
+      is_optional: true,
+      exercise: {
+        id: s.exercise_id,
+        name: s.exercise_name || 'Ejercicio',
+        target_muscle: s.target_muscle || '',
+        category: s.category || '',
+        equipment: s.equipment || '',
+      },
+    });
+  }
+
+  return { items, substitutionsMap };
+}
+
 export default function WorkoutActive({
   user,
   routineId,
@@ -280,12 +353,21 @@ export default function WorkoutActive({
           };
         });
 
-      setExercises(loadedExercises);
+      // Reconstruir la sesión tal y como estaba: sustituciones y ejercicios
+      // extra se guardan en el servidor (antes solo vivían en memoria).
+      const restoredExercises = rebuildSessionExercises(
+        loadedExercises,
+        startData.substitutions,
+        startData.extra_exercises,
+        Array.isArray(startData.sets) ? startData.sets : []
+      );
+      setExercises(restoredExercises.items);
+      setSubstitutionsMap(restoredExercises.substitutionsMap);
 
       // Recuperar exactamente el ejercicio que estaba activo antes
       // de refrescar o cambiar de dispositivo.
       if (startData.current_exercise_id) {
-        const restoredIndex = loadedExercises.findIndex(
+        const restoredIndex = restoredExercises.items.findIndex(
           (item: any) =>
             item.exercise?.id === startData.current_exercise_id ||
             item.exercise_id === startData.current_exercise_id ||
@@ -375,7 +457,7 @@ export default function WorkoutActive({
     }
   };
 
-  const addExtraExercise = () => {
+  const addExtraExercise = async () => {
     const ex = catalog.find((e) => e.id === extraId);
     if (!ex) {
       setError('Elige un ejercicio.');
@@ -387,6 +469,38 @@ export default function WorkoutActive({
       setShowAddExtra(false);
       return;
     }
+    if (!workoutLog?.id) {
+      setError('La sesión todavía no está lista.');
+      return;
+    }
+
+    // Se guarda primero en el servidor: si falla, no se añade a medias y
+    // el usuario ve el error (antes se perdía en silencio al recargar).
+    try {
+      const res = await apiFetch(
+        `/api/workouts/${encodeURIComponent(workoutLog.id)}/extra-exercises?user_id=${encodeURIComponent(user.id)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            exercise_id: ex.id,
+            target_sets: 3,
+            target_rep_min: 8,
+            target_rep_max: 12,
+            target_rir: 2,
+            rest_seconds: 90,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const fail = await res.json().catch(() => ({}));
+        throw new Error(typeof fail.detail === 'string' ? fail.detail : 'No se pudo añadir el ejercicio.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'No se pudo añadir el ejercicio.');
+      return;
+    }
+
     const item = {
       id: 'extra-' + ex.id,
       exercise_id: ex.id,
@@ -679,7 +793,7 @@ export default function WorkoutActive({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Conflicto al sustituir ejercicio.');
+        throw new Error((typeof data.detail === 'string' && data.detail) || data.error || 'Conflicto al sustituir ejercicio.');
       }
 
       // Success! Update active exercises list locally
@@ -701,7 +815,7 @@ export default function WorkoutActive({
       // Update substitutions tracking map
       setSubstitutionsMap({
         ...substitutionsMap,
-        [activeExercise.id]: substitutedExItem
+        [alternativeExerciseId]: substitutedExItem
       });
 
       setShowSubModal(false);
