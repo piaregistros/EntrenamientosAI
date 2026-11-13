@@ -1,14 +1,31 @@
 import { Dumbbell } from 'lucide-react';
-import { exerciseIconSrc, IconExercise } from '../lib/exerciseIcons';
+import MuscleMap from './MuscleMap';
+import { MuscleExercise, resolveExerciseMuscles } from '../lib/exerciseMuscles';
 
-// Ilustración del ejercicio (mapa explícito en lib/exerciseIcons.ts) o un icono neutro si no hay coincidencia.
-export default function ExerciseIcon({ exercise, className }: { exercise?: IconExercise | null; className: string }) {
-  const src = exercise ? exerciseIconSrc(exercise) : null;
-  return src ? (
-    <img src={src} alt="" className={`${className} object-cover bg-white`} />
-  ) : (
-    <span className={`${className} bg-neutral-800 text-neutral-400 inline-flex items-center justify-center`}>
-      <Dumbbell size={16} />
+// Mapa muscular del ejercicio (cuerpo en gris, músculo principal resaltado)
+// o un icono neutro si no hay coincidencia.
+export default function ExerciseIcon({
+  exercise,
+  className,
+  compact = true,
+}: {
+  exercise?: MuscleExercise | null;
+  className: string;
+  compact?: boolean;
+}) {
+  const highlight = exercise ? resolveExerciseMuscles(exercise).highlight : null;
+  if (highlight) {
+    return (
+      <MuscleMap
+        highlight={highlight}
+        compact={compact}
+        className={`${className} overflow-hidden`}
+      />
+    );
+  }
+  return (
+    <span className={`${className} inline-flex items-center justify-center`} aria-hidden>
+      <Dumbbell className="w-[60%] h-[60%]" />
     </span>
   );
 }

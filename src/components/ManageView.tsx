@@ -225,7 +225,7 @@ export default function ManageView({ user, onBack }: Props) {
           {(openRoutine.exercises || []).map((re: any, i: number) => (
             <div key={re.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 space-y-2">
               <div className="flex items-center gap-2">
-                <ExerciseIcon exercise={re} className="w-7 h-7 rounded-lg shrink-0" />
+                <ExerciseIcon exercise={re} className="w-12 h-12 rounded-lg shrink-0" />
                 <p className="flex-1 text-sm font-bold text-white">{re.name || re.exercise?.name}</p>
                 <button type="button" disabled={i === 0} onClick={() => move(i, -1)} className="p-1.5 text-neutral-400 disabled:opacity-30"><ChevronUp size={16} /></button>
                 <button type="button" disabled={i === openRoutine.exercises.length - 1} onClick={() => move(i, 1)} className="p-1.5 text-neutral-400 disabled:opacity-30"><ChevronDown size={16} /></button>
@@ -249,7 +249,7 @@ export default function ManageView({ user, onBack }: Props) {
             <input id="input-add-exercise" className={inputCls} value={addQuery} onChange={(e) => setAddQuery(e.target.value)} placeholder="Añadir ejercicio: escribe para buscar" />
             {addCandidates.map((e) => (
               <button key={e.id} type="button" onClick={() => addToRoutine(e.id)} className="w-full text-left flex items-center gap-2 p-2 rounded-lg bg-neutral-950 border border-neutral-800">
-                <ExerciseIcon exercise={e} className="w-6 h-6 rounded-md shrink-0" />
+                <ExerciseIcon exercise={e} className="w-10 h-10 rounded-md shrink-0" />
                 <span className="flex-1 text-xs font-bold text-white">{e.name}</span>
                 <span className="text-[10px] text-neutral-500">{e.equipment}</span>
                 <Plus size={14} className="text-lime-400" />
@@ -264,7 +264,7 @@ export default function ManageView({ user, onBack }: Props) {
           <input id="input-filter-exercises" className={inputCls} value={exFilter} onChange={(e) => setExFilter(e.target.value)} placeholder="Filtrar por nombre o músculo" />
           {visibleExercises.map((e) => (
             <div key={e.id} className={`bg-neutral-900 border border-neutral-800 rounded-2xl p-3 flex items-center gap-2 ${e.is_active ? '' : 'opacity-50'}`}>
-              <ExerciseIcon exercise={e} className="w-7 h-7 rounded-lg shrink-0" />
+              <ExerciseIcon exercise={e} className="w-12 h-12 rounded-lg shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-white truncate">{e.name}</p>
                 <p className="text-[10px] text-neutral-500">{e.equipment} · {e.target_muscle}{e.is_custom ? ' · propio' : ''}{e.is_active ? '' : ' · desactivado'}</p>
