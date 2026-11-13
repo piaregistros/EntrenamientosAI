@@ -8,6 +8,7 @@ import { apiFetch } from '../lib/api';
 import { isTimedExercise, rememberMeasure, fmtKg } from '../lib/measure';
 import { rebuildSessionExercises } from '../lib/rebuildSession';
 import { REST_MIN, REST_STEP, formatRest, rememberExerciseRest, resolveRestSeconds } from '../lib/restTimer';
+import { cancelRestPush, scheduleRestPush } from '../lib/push';
 import ExerciseIcon from './ExerciseIcon';
 
 interface WorkoutActiveProps {
@@ -139,8 +140,33 @@ export default function WorkoutActive({
     setElapsedSeconds(Math.max(0, Math.floor((Date.now() - start) / 1000)));
   };
 
-  const persistRestEnds = (ends: number, total: number) => {
-    try { sessionStorage.setItem('entreno-rest-ends', JSON.stringify({ ends, total })); } catch {}
+  const restExerciseName = () => {
+    const item = exercises[activeExIndex];
+    return String(item?.exercise?.name || item?.name || '').trim();
+  };
+
+  const persistRestEnds = (ends: number, total: number, exerciseName?: string) => {
+    try {
+      let name = exerciseName || '';
+      if (!name) {
+        try {
+          const prev = sessionStorage.getItem('entreno-rest-ends');
+          if (prev && prev.startsWith('{')) {
+            const parsed = JSON.parse(prev);
+            if (parsed?.exerciseName) name = String(parsed.exerciseName);
+          }
+        } catch {}
+      }
+      sessionStorage.setItem('entreno-rest-ends', JSON.stringify({ ends, total, exerciseName: name }));
+    } catch {}
+  };
+
+  const syncRestPush = (seconds: number | null, exerciseName?: string) => {
+    if (seconds && seconds > 0) {
+      void scheduleRestPush(seconds, exerciseName || restExerciseName());
+    } else {
+      void cancelRestPush();
+    }
   };
 
   const syncRestFromClock = () => {
@@ -157,14 +183,16 @@ export default function WorkoutActive({
     }
   };
 
-  const beginRest = (seconds: number) => {
+  const beginRest = (seconds: number, exerciseName?: string) => {
     if (!seconds || seconds <= 0) return;
     const duration = Math.max(REST_MIN, seconds);
+    const name = exerciseName || restExerciseName();
     setTotalRestDuration(duration);
     const ends = Date.now() + duration * 1000;
     restEndsAtMsRef.current = ends;
-    persistRestEnds(ends, duration);
+    persistRestEnds(ends, duration, name);
     setRestSecondsLeft(duration);
+    syncRestPush(duration, name);
   };
 
   const addRestSeconds = (extra: number) => {
@@ -175,16 +203,18 @@ export default function WorkoutActive({
     const left = Math.max(REST_MIN, Math.ceil((ends - Date.now()) / 1000));
     const total = extra > 0 ? Math.max(totalRestDuration, left) : totalRestDuration;
     setTotalRestDuration(total);
-    persistRestEnds(ends, total);
+    persistRestEnds(ends, total, restExerciseName());
     setRestSecondsLeft(left);
     const eid = exercises[activeExIndex]?.exercise?.id;
     if (eid) rememberExerciseRest(eid, left);
+    syncRestPush(left, restExerciseName());
   };
 
   const clearRest = () => {
     restEndsAtMsRef.current = null;
     try { sessionStorage.removeItem('entreno-rest-ends'); } catch {}
     setRestSecondsLeft(null);
+    syncRestPush(null);
   };
 
   useEffect(() => {
@@ -205,8 +235,11 @@ export default function WorkoutActive({
           const left = Math.ceil((ends - Date.now()) / 1000);
           setRestSecondsLeft(left);
           setTotalRestDuration(total > 0 ? total : left);
+          const name = saved.startsWith('{') ? String((JSON.parse(saved) as any).exerciseName || '') : '';
+          void scheduleRestPush(left, name);
         } else {
           sessionStorage.removeItem('entreno-rest-ends');
+          void cancelRestPush();
         }
       }
     } catch {}
@@ -700,6 +733,7 @@ export default function WorkoutActive({
 
       setShowFinishModal(false);
       setWorkoutCompleted(true);
+      clearRest();
     } catch (err: any) {
       setError(err.message || 'Error al guardar entrenamiento.');
       setShowFinishModal(false);
@@ -727,6 +761,7 @@ export default function WorkoutActive({
       }
 
       setShowCancelConfirm(false);
+      clearRest();
       onWorkoutExit();
     } catch (err: any) {
       setError(err.message || 'Error al cancelar el entrenamiento.');

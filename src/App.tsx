@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiFetch } from './lib/api';
+import { ensurePushReady } from './lib/push';
 import BottomNav from './components/BottomNav';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -92,6 +93,11 @@ export default function App() {
     window.addEventListener('unauthorized', handleUnauthorized);
     return () => { mounted = false; window.removeEventListener('unauthorized', handleUnauthorized); };
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    ensurePushReady().catch(() => {});
+  }, [user]);
 
   if (checkingSession) {
     return <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-lime-400 font-bold">Iniciando...</div>;

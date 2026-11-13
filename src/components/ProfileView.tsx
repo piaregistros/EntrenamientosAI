@@ -3,6 +3,7 @@ import { User, Lock, Trash2, KeyRound, Loader, AlertCircle, CheckCircle2, LogOut
 import { BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
 import ThemeToggle from './ThemeToggle';
+import RestPushSettings from './RestPushSettings';
 import ManageView from './ManageView';
 
 interface ProfileViewProps {
@@ -344,6 +345,7 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
       )}
 
       <ThemeToggle />
+      <RestPushSettings />
       <button type="button" id="btn-open-manage" onClick={() => setShowManage(true)}
         className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-left">
         <h3 className="text-sm font-extrabold text-white">Gestionar rutinas y ejercicios</h3>
