@@ -954,7 +954,7 @@ export default function WorkoutActive({
   const weightStep = Number(activeRec?.increment_kg) > 0 ? Number(activeRec.increment_kg) : (Number(activeExercise?.weight_increment_kg) > 0 ? Number(activeExercise.weight_increment_kg) : 2.5);
 
   return (
-    <div id="active-workout-panel" className="min-h-screen w-full bg-neutral-950 text-neutral-100 pb-8 max-w-md mx-auto select-none relative">
+    <div id="active-workout-panel" className={`min-h-screen w-full bg-neutral-950 text-neutral-100 max-w-md mx-auto select-none relative ${restSecondsLeft !== null ? "pb-36" : "pb-8"}`}>
       
       {/* Upper sticky header with timer */}
       <div className="sticky top-0 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-900 px-4 py-3.5 z-30 flex items-center justify-between">
@@ -1517,6 +1517,9 @@ export default function WorkoutActive({
             <span>Cancelar Sesión</span>
           </button>
         </div>
+
+        {/* Hueco para que la barra fija del temporizador no tape ni intercepte Cancelar/Salir. */}
+        {restSecondsLeft !== null && <div aria-hidden="true" className="h-28" />}
 
       </div>
 
