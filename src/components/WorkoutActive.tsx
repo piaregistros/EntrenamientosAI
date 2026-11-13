@@ -906,7 +906,7 @@ export default function WorkoutActive({
                   style={{ minWidth: '100px' }}
                 >
                   <span className="opacity-60">{idx + 1}.</span>
-                  <span className="truncate max-w-[110px] flex items-center gap-1"><ExerciseIcon exercise={re.exercise} className="w-6 h-6 rounded" />{re.exercise?.name}</span>
+                  <span className="truncate max-w-[110px] flex items-center gap-1"><ExerciseIcon exercise={re.exercise} className="w-12 h-12 rounded" />{re.exercise?.name}</span>
                   {setsCount > 0 && (
                     <span className="bg-lime-500 text-black w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold">
                       {setsCount}
@@ -963,7 +963,7 @@ export default function WorkoutActive({
               <div>
                 <span className="text-[10px] font-bold text-lime-400 uppercase tracking-widest">{activeExercise.target_muscle}</span>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <ExerciseIcon exercise={activeExercise} className="w-12 h-12 rounded-xl mr-2" /><h3 id="active-exercise-name" className="text-xl font-extrabold text-white leading-tight">{activeExercise.name}</h3>
+                  <ExerciseIcon exercise={activeExercise} compact={false} className="w-16 h-32 rounded-xl mr-2 bg-neutral-950" /><h3 id="active-exercise-name" className="text-xl font-extrabold text-white leading-tight">{activeExercise.name}</h3>
                   {onOpenExerciseInfo && (
                     <button
                       onClick={() => onOpenExerciseInfo(activeExercise)}

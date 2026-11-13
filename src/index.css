@@ -2,10 +2,20 @@
 
 html {
   color-scheme: dark;
+  --muscle-idle: #3f3f3f;
+  --muscle-primary: #a3e635;
+  --muscle-secondary: #65a30d;
+  --muscle-gap: #171717;
+  --muscle-outline: #525252;
 }
 
 html[data-theme="light"] {
   color-scheme: light;
+  --muscle-idle: #c5c5cb;
+  --muscle-primary: #4d7c0f;
+  --muscle-secondary: #84cc16;
+  --muscle-gap: #ffffff;
+  --muscle-outline: #a1a1aa;
 }
 
 html,

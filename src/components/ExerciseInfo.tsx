@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Info, Dumbbell, ShieldAlert, Award, Play, ExternalLink } from 'lucide-react';
+import { X, Info, ShieldAlert, Award, Play, ExternalLink } from 'lucide-react';
 import { Exercise } from '../types';
 import { apiFetch } from '../lib/api';
+import ExerciseIcon from './ExerciseIcon';
 
 interface ExerciseInfoProps {
   exercise: Exercise | null;
@@ -139,11 +140,9 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
           >
             {/* Header */}
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-lime-500/10 text-lime-400 rounded-lg">
-                  <Dumbbell size={20} />
-                </div>
-                <div>
+              <div className="flex items-center gap-3 min-w-0">
+                <ExerciseIcon exercise={ex} compact={false} className="w-14 h-28 shrink-0 rounded-lg bg-neutral-950" />
+                <div className="min-w-0">
                   <h3 className="font-bold text-lg text-white leading-tight">
                     {ex.name}
                   </h3>
@@ -369,6 +368,10 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
               {/* TAB 3: FICHA */}
               {activeTab === 'ficha' && (
                 <div className="space-y-4">
+                  <div className="flex flex-col items-center gap-2 bg-neutral-950/50 border border-neutral-800 rounded-xl p-4">
+                    <ExerciseIcon exercise={ex} compact={false} className="w-32 h-64" />
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-neutral-500">Músculos implicados</p>
+                  </div>
                   <div className="divide-y divide-neutral-800 bg-neutral-950/50 border border-neutral-800 rounded-xl overflow-hidden">
                     <div className="flex justify-between p-3.5 text-sm">
                       <span className="text-neutral-400">Equipamiento</span>
