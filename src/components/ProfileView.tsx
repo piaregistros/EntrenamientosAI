@@ -1,11 +1,13 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
+import ChunkErrorBoundary from './ChunkErrorBoundary';
 import { User, Lock, Trash2, KeyRound, Loader, AlertCircle, CheckCircle2, LogOut, Scale, Plus, Search } from 'lucide-react';
 import { BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
 import ThemeToggle from './ThemeToggle';
 import RestPushSettings from './RestPushSettings';
 import HomeEquipmentSettings from './HomeEquipmentSettings';
-const ManageView = lazy(() => import('./ManageView'));
+const ManageView = lazyWithRetry(() => import('./ManageView'));
 
 interface ProfileViewProps {
   user: any;
@@ -262,7 +264,15 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
     }
   };
 
-  if (showManage) return <Suspense fallback={<div className="min-h-screen bg-neutral-950 flex items-center justify-center text-lime-400 font-bold">Cargando...</div>}><ManageView user={user} onBack={() => setShowManage(false)} /></Suspense>;
+  if (showManage) {
+    return (
+      <ChunkErrorBoundary label="rutinas y ejercicios" onReset={() => setShowManage(false)}>
+        <Suspense fallback={<div className="min-h-screen bg-neutral-950 flex items-center justify-center text-lime-400 font-bold">Cargando...</div>}>
+          <ManageView user={user} onBack={() => setShowManage(false)} />
+        </Suspense>
+      </ChunkErrorBoundary>
+    );
+  }
 
   return (
     <div id="profile-panel-container" className="min-h-screen bg-neutral-950 text-neutral-100 pb-24 px-4 pt-6 max-w-md mx-auto select-none space-y-6">

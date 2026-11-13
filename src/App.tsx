@@ -1,17 +1,19 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { apiFetch } from './lib/api';
 import Login from './components/Login';
 import { Exercise } from './types';
+import { lazyWithRetry } from './lib/lazyWithRetry';
+import ChunkErrorBoundary from './components/ChunkErrorBoundary';
 
-const Dashboard = lazy(() => import('./components/Dashboard'));
-const WorkoutActive = lazy(() => import('./components/WorkoutActive'));
-const HistoryList = lazy(() => import('./components/HistoryList'));
-const StatsView = lazy(() => import('./components/StatsView'));
-const ProfileView = lazy(() => import('./components/ProfileView'));
-const Onboarding = lazy(() => import('./components/Onboarding/Onboarding'));
-const DietView = lazy(() => import('./components/DietView'));
-const ExerciseInfo = lazy(() => import('./components/ExerciseInfo'));
-const BottomNav = lazy(() => import('./components/BottomNav'));
+const Dashboard = lazyWithRetry(() => import('./components/Dashboard'));
+const WorkoutActive = lazyWithRetry(() => import('./components/WorkoutActive'));
+const HistoryList = lazyWithRetry(() => import('./components/HistoryList'));
+const StatsView = lazyWithRetry(() => import('./components/StatsView'));
+const ProfileView = lazyWithRetry(() => import('./components/ProfileView'));
+const Onboarding = lazyWithRetry(() => import('./components/Onboarding/Onboarding'));
+const DietView = lazyWithRetry(() => import('./components/DietView'));
+const ExerciseInfo = lazyWithRetry(() => import('./components/ExerciseInfo'));
+const BottomNav = lazyWithRetry(() => import('./components/BottomNav'));
 
 function ScreenFallback() {
   return (
@@ -108,14 +110,16 @@ export default function App() {
   }, [user]);
 
   const infoModal = (
-    <Suspense fallback={null}>
-      <ExerciseInfo
-        exercise={selectedExercise}
-        isOpen={isExerciseInfoOpen}
-        onClose={() => setIsExerciseInfoOpen(false)}
-        userId={user?.id}
-      />
-    </Suspense>
+    <ChunkErrorBoundary label="ficha de ejercicio" onReset={() => setIsExerciseInfoOpen(false)}>
+      <Suspense fallback={null}>
+        <ExerciseInfo
+          exercise={selectedExercise}
+          isOpen={isExerciseInfoOpen}
+          onClose={() => setIsExerciseInfoOpen(false)}
+          userId={user?.id}
+        />
+      </Suspense>
+    </ChunkErrorBoundary>
   );
 
   if (checkingSession) {
@@ -124,21 +128,25 @@ export default function App() {
   if (!user) return <Login onLoginSuccess={(u: any) => { setUser(u); setActiveTab('home'); apiFetch('/api/onboarding').then(r => r.json()).then(d => setNeedsOnboarding(!!d.required)).catch(() => {}); }} />;
   if (needsOnboarding) {
     return (
-      <Suspense fallback={<ScreenFallback />}>
-        <Onboarding user={user} onComplete={() => setNeedsOnboarding(false)} />
-      </Suspense>
+      <ChunkErrorBoundary label="inicio">
+        <Suspense fallback={<ScreenFallback />}>
+          <Onboarding user={user} onComplete={() => setNeedsOnboarding(false)} />
+        </Suspense>
+      </ChunkErrorBoundary>
     );
   }
 
   if (activeRoutineId) {
     return (
       <div className="bg-neutral-950 min-h-screen">
-        <Suspense fallback={<ScreenFallback />}>
-          <WorkoutActive user={user} routineId={activeRoutineId} existingWorkoutId={activeWorkoutId}
-            onWorkoutFinished={() => { setActiveWorkoutId(null); setActiveRoutineId(null); navigateToTab('history'); }}
-            onWorkoutExit={() => { setActiveWorkoutId(null); setActiveRoutineId(null); navigateToTab('home'); }}
-            onOpenExerciseInfo={handleOpenExerciseInfo} />
-        </Suspense>
+        <ChunkErrorBoundary label="entreno">
+          <Suspense fallback={<ScreenFallback />}>
+            <WorkoutActive user={user} routineId={activeRoutineId} existingWorkoutId={activeWorkoutId}
+              onWorkoutFinished={() => { setActiveWorkoutId(null); setActiveRoutineId(null); navigateToTab('history'); }}
+              onWorkoutExit={() => { setActiveWorkoutId(null); setActiveRoutineId(null); navigateToTab('home'); }}
+              onOpenExerciseInfo={handleOpenExerciseInfo} />
+          </Suspense>
+        </ChunkErrorBoundary>
         {infoModal}
       </div>
     );
@@ -146,17 +154,19 @@ export default function App() {
 
   return (
     <div className="bg-neutral-950 min-h-screen">
-      <Suspense fallback={<ScreenFallback />}>
-        {activeTab === 'home' && (
-          <Dashboard user={user} onStartWorkout={(id) => { setActiveWorkoutId(null); setActiveRoutineId(id); }}
-            onNavigateToTab={(tab) => navigateToTab(tab)} onOpenExerciseInfo={handleOpenExerciseInfo} />
-        )}
-        {activeTab === 'history' && <HistoryList user={user} onOpenExerciseInfo={handleOpenExerciseInfo} />}
-        {activeTab === 'stats' && <StatsView user={user} />}
-        {activeTab === 'diet' && <DietView user={user} />}
-        {activeTab === 'profile' && <ProfileView user={user} onLogout={() => { setUser(null); setActiveRoutineId(null); setActiveTab('home'); }} />}
-        <BottomNav activeTab={activeTab} setActiveTab={navigateToTab} />
-      </Suspense>
+      <ChunkErrorBoundary label="pantalla" onReset={() => navigateToTab('home')}>
+        <Suspense fallback={<ScreenFallback />}>
+          {activeTab === 'home' && (
+            <Dashboard user={user} onStartWorkout={(id) => { setActiveWorkoutId(null); setActiveRoutineId(id); }}
+              onNavigateToTab={(tab) => navigateToTab(tab)} onOpenExerciseInfo={handleOpenExerciseInfo} />
+          )}
+          {activeTab === 'history' && <HistoryList user={user} onOpenExerciseInfo={handleOpenExerciseInfo} />}
+          {activeTab === 'stats' && <StatsView user={user} />}
+          {activeTab === 'diet' && <DietView user={user} />}
+          {activeTab === 'profile' && <ProfileView user={user} onLogout={() => { setUser(null); setActiveRoutineId(null); setActiveTab('home'); }} />}
+          <BottomNav activeTab={activeTab} setActiveTab={navigateToTab} />
+        </Suspense>
+      </ChunkErrorBoundary>
       {infoModal}
     </div>
   );

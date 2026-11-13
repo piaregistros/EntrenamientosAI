@@ -1,10 +1,11 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Trophy, TrendingUp, Dumbbell, Timer, Flame, CheckCircle, BarChart3, ChevronRight, Loader, AlertTriangle } from 'lucide-react';
 import { PRRecord, WorkoutStats } from '../types';
 import { apiFetch } from '../lib/api';
-const BodyEvolutionSection = lazy(() => import('./BodyEvolutionSection'));
-const ExerciseProgressChart = lazy(() => import('./ExerciseProgressChart'));
-const WeeklyVolume = lazy(() => import('./WeeklyVolume'));
+const BodyEvolutionSection = lazyWithRetry(() => import('./BodyEvolutionSection'));
+const ExerciseProgressChart = lazyWithRetry(() => import('./ExerciseProgressChart'));
+const WeeklyVolume = lazyWithRetry(() => import('./WeeklyVolume'));
 
 interface StatsViewProps {
   user: any;

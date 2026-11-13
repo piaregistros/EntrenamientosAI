@@ -1,9 +1,10 @@
-import React, { useEffect, useState, lazy, Suspense } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { apiFetch } from '../lib/api';
 import { fmtKg } from '../lib/measure';
 import { StagnationItem } from '../types';
 
-const WeeklyVolume = lazy(() => import('./WeeklyVolume'));
+const WeeklyVolume = lazyWithRetry(() => import('./WeeklyVolume'));
 
 type Home = {
   tomorrow: string;

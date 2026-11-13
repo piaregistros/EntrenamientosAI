@@ -1,8 +1,12 @@
-const CACHE = 'entreno-pwa-v2';
+const CACHE = 'entreno-pwa-v3';
 
+// No precacheamos "/" (index.html): si el SW no se reinstala tras un deploy,
+// un índice viejo apunta a chunks con hash que ya no existen y la app
+// queda en negro (ChunkLoadError). El HTML solo se guarda como último
+// recurso offline, y siempre se actualiza tras una navegación buena.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(['/', '/manifest.webmanifest'])).then(() => self.skipWaiting())
+    caches.open(CACHE).then((cache) => cache.addAll(['/manifest.webmanifest'])).then(() => self.skipWaiting())
   );
 });
 
@@ -14,14 +18,35 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function isHtmlRequest(request, url) {
+  if (request.mode === 'navigate') return true;
+  if (url.pathname === '/' || url.pathname.endsWith('.html')) return true;
+  const accept = request.headers.get('accept') || '';
+  return accept.includes('text/html');
+}
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api')) return;
-  if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).catch(() => caches.match('/')));
+  // El propio worker no debe cachearse: si no, un SW viejo no se actualiza.
+  if (url.pathname === '/sw.js' || url.pathname.endsWith('/sw.js')) return;
+
+  if (isHtmlRequest(event.request, url)) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put('/', copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match('/').then((cached) => cached || caches.match(event.request)))
+    );
     return;
   }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {

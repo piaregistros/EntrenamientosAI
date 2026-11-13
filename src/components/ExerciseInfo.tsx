@@ -1,10 +1,11 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Info, ShieldAlert, Award, Play, ExternalLink } from 'lucide-react';
 import { Exercise } from '../types';
 import { apiFetch } from '../lib/api';
 import ExerciseIcon from './ExerciseIcon';
-const ExerciseProgressChart = lazy(() => import('./ExerciseProgressChart'));
+const ExerciseProgressChart = lazyWithRetry(() => import('./ExerciseProgressChart'));
 
 interface ExerciseInfoProps {
   exercise: Exercise | null;

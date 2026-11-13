@@ -1,8 +1,9 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { VolumeChart, fetchVolumeChart } from '../lib/progressApi';
 import { GROUP_COLORS, GroupedBars } from './charts/SvgCharts';
 
-const MuscleHeatMap = lazy(() => import('./MuscleHeatMap'));
+const MuscleHeatMap = lazyWithRetry(() => import('./MuscleHeatMap'));
 
 export default function WeeklyVolume({
   userId,
