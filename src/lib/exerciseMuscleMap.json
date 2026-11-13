@@ -1,67 +1,865 @@
 {
-  "press banca plano": { "primary": ["chest"], "secondary": ["front_deltoid", "triceps"], "view": "front", "focus": "upper" },
-  "press banca con mancuernas": { "primary": ["chest"], "secondary": ["front_deltoid", "triceps"], "view": "front", "focus": "upper" },
-  "press inclinado con mancuernas 30 grados": { "primary": ["chest"], "secondary": ["front_deltoid", "triceps"], "view": "front", "focus": "upper" },
-  "press convergente de pecho": { "primary": ["chest"], "secondary": ["front_deltoid", "triceps"], "view": "front", "focus": "upper" },
-  "press inclinado en maquina": { "primary": ["chest"], "secondary": ["front_deltoid", "triceps"], "view": "front", "focus": "upper" },
-  "aperturas de pecho en maquina": { "primary": ["chest"], "secondary": ["front_deltoid"], "view": "front", "focus": "upper" },
-  "cruce de poleas": { "primary": ["chest"], "secondary": ["front_deltoid"], "view": "front", "focus": "upper" },
-
-  "press militar con barra": { "primary": ["front_deltoid"], "secondary": ["triceps", "trapezius"], "view": "front", "focus": "upper" },
-  "press de hombro con mancuernas agarre neutro": { "primary": ["front_deltoid"], "secondary": ["triceps", "trapezius"], "view": "front", "focus": "upper" },
-  "press de hombros en maquina": { "primary": ["front_deltoid"], "secondary": ["triceps", "trapezius"], "view": "front", "focus": "upper" },
-  "elevaciones laterales con mancuernas": { "primary": ["front_deltoid"], "secondary": ["trapezius"], "view": "front", "focus": "upper" },
-  "elevaciones laterales en maquina": { "primary": ["front_deltoid"], "secondary": ["trapezius"], "view": "front", "focus": "upper" },
-  "elevaciones laterales en polea": { "primary": ["front_deltoid"], "secondary": ["trapezius"], "view": "front", "focus": "upper" },
-  "pajaros en maquina": { "primary": ["rear_deltoid"], "secondary": ["trapezius"], "view": "back", "focus": "upper" },
-  "face pull": { "primary": ["rear_deltoid"], "secondary": ["trapezius"], "view": "back", "focus": "upper" },
-
-  "jalon al pecho agarre amplio": { "primary": ["lats"], "secondary": ["biceps", "rear_deltoid", "trapezius"], "view": "back", "focus": "upper" },
-  "jalon al pecho agarre neutro": { "primary": ["lats"], "secondary": ["biceps", "rear_deltoid", "trapezius"], "view": "back", "focus": "upper" },
-  "jalon unilateral en polea": { "primary": ["lats"], "secondary": ["biceps", "rear_deltoid"], "view": "back", "focus": "upper" },
-  "pullover en polea": { "primary": ["lats"], "secondary": ["chest"], "view": "back", "focus": "upper" },
-  "remo en maquina": { "primary": ["lats"], "secondary": ["rear_deltoid", "trapezius", "biceps"], "view": "back", "focus": "upper" },
-  "remo con pecho apoyado": { "primary": ["lats"], "secondary": ["rear_deltoid", "biceps"], "view": "back", "focus": "upper" },
-  "remo sentado en polea": { "primary": ["lats"], "secondary": ["rear_deltoid", "trapezius", "biceps"], "view": "back", "focus": "upper" },
-  "remo unilateral en polea": { "primary": ["lats"], "secondary": ["rear_deltoid", "biceps"], "view": "back", "focus": "upper" },
-  "remo unilateral con mancuerna": { "primary": ["lats"], "secondary": ["rear_deltoid", "biceps"], "view": "back", "focus": "upper" },
-
-  "curl con mancuernas": { "primary": ["biceps"], "secondary": ["forearm"], "view": "front", "focus": "upper" },
-  "curl inclinado con mancuernas": { "primary": ["biceps"], "secondary": ["forearm"], "view": "front", "focus": "upper" },
-  "curl martillo": { "primary": ["biceps"], "secondary": ["forearm"], "view": "front", "focus": "upper" },
-  "curl de biceps en maquina": { "primary": ["biceps"], "secondary": ["forearm"], "view": "front", "focus": "upper" },
-  "curl de biceps en polea": { "primary": ["biceps"], "secondary": ["forearm"], "view": "front", "focus": "upper" },
-  "extension de triceps en polea": { "primary": ["triceps"], "secondary": ["forearm"], "view": "back", "focus": "upper" },
-  "extension de triceps con cuerda": { "primary": ["triceps"], "secondary": ["forearm"], "view": "back", "focus": "upper" },
-  "extension de triceps por encima de la cabeza": { "primary": ["triceps"], "secondary": ["forearm"], "view": "back", "focus": "upper" },
-  "press frances": { "primary": ["triceps"], "secondary": ["forearm"], "view": "back", "focus": "upper" },
-
-  "prensa de piernas": { "primary": ["quadriceps"], "secondary": ["glutes", "adductors"], "view": "front", "focus": "lower" },
-  "prensa unilateral": { "primary": ["quadriceps"], "secondary": ["glutes", "adductors"], "view": "front", "focus": "lower" },
-  "extension de cuadriceps": { "primary": ["quadriceps"], "secondary": [], "view": "front", "focus": "lower" },
-  "hack squat": { "primary": ["quadriceps"], "secondary": ["glutes", "adductors"], "view": "front", "focus": "lower" },
-  "sentadilla libre": { "primary": ["quadriceps"], "secondary": ["glutes", "adductors"], "view": "front", "focus": "lower" },
-  "sentadilla goblet": { "primary": ["quadriceps"], "secondary": ["glutes", "adductors"], "view": "front", "focus": "lower" },
-  "sentadilla bulgara": { "primary": ["quadriceps"], "secondary": ["glutes", "hamstrings"], "view": "front", "focus": "lower" },
-  "zancadas": { "primary": ["quadriceps"], "secondary": ["glutes", "hamstrings"], "view": "front", "focus": "lower" },
-  "step-up": { "primary": ["quadriceps"], "secondary": ["glutes", "hamstrings"], "view": "front", "focus": "lower" },
-  "elevacion de gemelos de pie": { "primary": ["calves"], "secondary": [], "view": "back", "focus": "lower" },
-  "elevacion de gemelos sentado": { "primary": ["calves"], "secondary": [], "view": "back", "focus": "lower" },
-
-  "hip thrust": { "primary": ["glutes"], "secondary": ["hamstrings"], "view": "back", "focus": "lower" },
-  "hip thrust unilateral": { "primary": ["glutes"], "secondary": ["hamstrings"], "view": "back", "focus": "lower" },
-  "extension de cadera en maquina": { "primary": ["glutes"], "secondary": ["hamstrings"], "view": "back", "focus": "lower" },
-  "patada de gluteo en polea": { "primary": ["glutes"], "secondary": ["hamstrings"], "view": "back", "focus": "lower" },
-  "abduccion de cadera en maquina": { "primary": ["glutes"], "secondary": [], "view": "back", "focus": "lower" },
-  "peso muerto rumano": { "primary": ["hamstrings"], "secondary": ["glutes", "lower_back"], "view": "back", "focus": "lower" },
-  "peso muerto rumano con mancuernas": { "primary": ["hamstrings"], "secondary": ["glutes", "lower_back"], "view": "back", "focus": "lower" },
-  "curl femoral": { "primary": ["hamstrings"], "secondary": ["calves"], "view": "back", "focus": "lower" },
-  "curl femoral sentado": { "primary": ["hamstrings"], "secondary": ["calves"], "view": "back", "focus": "lower" },
-  "curl femoral tumbado": { "primary": ["hamstrings"], "secondary": ["calves"], "view": "back", "focus": "lower" },
-
-  "plancha": { "primary": ["abs"], "secondary": ["obliques"], "view": "front", "focus": "upper" },
-  "pallof press": { "primary": ["obliques"], "secondary": ["abs"], "view": "front", "focus": "upper" },
-  "crunch en maquina": { "primary": ["abs"], "secondary": ["obliques"], "view": "front", "focus": "upper" },
-  "crunch en polea": { "primary": ["abs"], "secondary": ["obliques"], "view": "front", "focus": "upper" },
-  "elevacion de rodillas": { "primary": ["abs"], "secondary": ["obliques"], "view": "front", "focus": "upper" }
+  "press banca plano": {
+    "primary": [
+      "chest"
+    ],
+    "secondary": [
+      "front_deltoid",
+      "triceps"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "press banca con mancuernas": {
+    "primary": [
+      "chest"
+    ],
+    "secondary": [
+      "front_deltoid",
+      "triceps"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "press inclinado con mancuernas 30 grados": {
+    "primary": [
+      "chest"
+    ],
+    "secondary": [
+      "front_deltoid",
+      "triceps"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "press convergente de pecho": {
+    "primary": [
+      "chest"
+    ],
+    "secondary": [
+      "front_deltoid",
+      "triceps"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "press inclinado en maquina": {
+    "primary": [
+      "chest"
+    ],
+    "secondary": [
+      "front_deltoid",
+      "triceps"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "aperturas de pecho en maquina": {
+    "primary": [
+      "chest"
+    ],
+    "secondary": [
+      "front_deltoid"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "cruce de poleas": {
+    "primary": [
+      "chest"
+    ],
+    "secondary": [
+      "front_deltoid"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "press militar con barra": {
+    "primary": [
+      "front_deltoid"
+    ],
+    "secondary": [
+      "triceps",
+      "trapezius"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "press de hombro con mancuernas agarre neutro": {
+    "primary": [
+      "front_deltoid"
+    ],
+    "secondary": [
+      "triceps",
+      "trapezius"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "press de hombros en maquina": {
+    "primary": [
+      "front_deltoid"
+    ],
+    "secondary": [
+      "triceps",
+      "trapezius"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "elevaciones laterales con mancuernas": {
+    "primary": [
+      "front_deltoid"
+    ],
+    "secondary": [
+      "trapezius"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "elevaciones laterales en maquina": {
+    "primary": [
+      "front_deltoid"
+    ],
+    "secondary": [
+      "trapezius"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "elevaciones laterales en polea": {
+    "primary": [
+      "front_deltoid"
+    ],
+    "secondary": [
+      "trapezius"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "pajaros en maquina": {
+    "primary": [
+      "rear_deltoid"
+    ],
+    "secondary": [
+      "trapezius"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "face pull": {
+    "primary": [
+      "rear_deltoid"
+    ],
+    "secondary": [
+      "trapezius"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "jalon al pecho agarre amplio": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "biceps",
+      "rear_deltoid",
+      "trapezius"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "jalon al pecho agarre neutro": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "biceps",
+      "rear_deltoid",
+      "trapezius"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "jalon unilateral en polea": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "biceps",
+      "rear_deltoid"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "pullover en polea": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "chest"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "remo en maquina": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "rear_deltoid",
+      "trapezius",
+      "biceps"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "remo con pecho apoyado": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "rear_deltoid",
+      "biceps"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "remo sentado en polea": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "rear_deltoid",
+      "trapezius",
+      "biceps"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "remo unilateral en polea": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "rear_deltoid",
+      "biceps"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "remo unilateral con mancuerna": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "rear_deltoid",
+      "biceps"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "curl con mancuernas": {
+    "primary": [
+      "biceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "curl inclinado con mancuernas": {
+    "primary": [
+      "biceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "curl martillo": {
+    "primary": [
+      "biceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "curl de biceps en maquina": {
+    "primary": [
+      "biceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "curl de biceps en polea": {
+    "primary": [
+      "biceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "extension de triceps en polea": {
+    "primary": [
+      "triceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "extension de triceps con cuerda": {
+    "primary": [
+      "triceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "extension de triceps por encima de la cabeza": {
+    "primary": [
+      "triceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "press frances": {
+    "primary": [
+      "triceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "prensa de piernas": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "adductors"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "prensa unilateral": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "adductors"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "extension de cuadriceps": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [],
+    "view": "front",
+    "focus": "lower"
+  },
+  "hack squat": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "adductors"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "sentadilla libre": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "adductors"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "sentadilla goblet": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "adductors"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "sentadilla bulgara": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "hamstrings"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "zancadas": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "hamstrings"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "step-up": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "hamstrings"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "elevacion de gemelos de pie": {
+    "primary": [
+      "calves"
+    ],
+    "secondary": [],
+    "view": "back",
+    "focus": "lower"
+  },
+  "elevacion de gemelos sentado": {
+    "primary": [
+      "calves"
+    ],
+    "secondary": [],
+    "view": "back",
+    "focus": "lower"
+  },
+  "hip thrust": {
+    "primary": [
+      "glutes"
+    ],
+    "secondary": [
+      "hamstrings"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "hip thrust unilateral": {
+    "primary": [
+      "glutes"
+    ],
+    "secondary": [
+      "hamstrings"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "extension de cadera en maquina": {
+    "primary": [
+      "glutes"
+    ],
+    "secondary": [
+      "hamstrings"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "patada de gluteo en polea": {
+    "primary": [
+      "glutes"
+    ],
+    "secondary": [
+      "hamstrings"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "abduccion de cadera en maquina": {
+    "primary": [
+      "glutes"
+    ],
+    "secondary": [],
+    "view": "back",
+    "focus": "lower"
+  },
+  "peso muerto rumano": {
+    "primary": [
+      "hamstrings"
+    ],
+    "secondary": [
+      "glutes",
+      "lower_back"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "peso muerto rumano con mancuernas": {
+    "primary": [
+      "hamstrings"
+    ],
+    "secondary": [
+      "glutes",
+      "lower_back"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "curl femoral": {
+    "primary": [
+      "hamstrings"
+    ],
+    "secondary": [
+      "calves"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "curl femoral sentado": {
+    "primary": [
+      "hamstrings"
+    ],
+    "secondary": [
+      "calves"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "curl femoral tumbado": {
+    "primary": [
+      "hamstrings"
+    ],
+    "secondary": [
+      "calves"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "plancha": {
+    "primary": [
+      "abs"
+    ],
+    "secondary": [
+      "obliques"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "pallof press": {
+    "primary": [
+      "obliques"
+    ],
+    "secondary": [
+      "abs"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "crunch en maquina": {
+    "primary": [
+      "abs"
+    ],
+    "secondary": [
+      "obliques"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "crunch en polea": {
+    "primary": [
+      "abs"
+    ],
+    "secondary": [
+      "obliques"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "elevacion de rodillas": {
+    "primary": [
+      "abs"
+    ],
+    "secondary": [
+      "obliques"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "press landmine": {
+    "primary": [
+      "front_deltoid"
+    ],
+    "secondary": [
+      "chest",
+      "triceps"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "remo landmine (meadows)": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "rear_deltoid",
+      "biceps"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "sentadilla landmine": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "adductors"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "peso muerto con trap bar": {
+    "primary": [
+      "hamstrings"
+    ],
+    "secondary": [
+      "glutes",
+      "quadriceps",
+      "lower_back"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "press inclinado con barra": {
+    "primary": [
+      "chest"
+    ],
+    "secondary": [
+      "front_deltoid",
+      "triceps"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "dominadas": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "biceps",
+      "rear_deltoid"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "dominadas agarre neutro": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "biceps",
+      "rear_deltoid"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "fondos en paralelas": {
+    "primary": [
+      "chest"
+    ],
+    "secondary": [
+      "triceps",
+      "front_deltoid"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "remo invertido en trx": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "rear_deltoid",
+      "biceps"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "swing con kettlebell": {
+    "primary": [
+      "glutes"
+    ],
+    "secondary": [
+      "hamstrings",
+      "lower_back"
+    ],
+    "view": "back",
+    "focus": "lower"
+  },
+  "sentadilla goblet con kettlebell": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "adductors"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "press de hombro con kettlebell": {
+    "primary": [
+      "front_deltoid"
+    ],
+    "secondary": [
+      "triceps",
+      "trapezius"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "extension de triceps en trx": {
+    "primary": [
+      "triceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "extension de triceps con goma": {
+    "primary": [
+      "triceps"
+    ],
+    "secondary": [
+      "forearm"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "face pull con goma": {
+    "primary": [
+      "rear_deltoid"
+    ],
+    "secondary": [
+      "trapezius"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "salto al cajon": {
+    "primary": [
+      "quadriceps"
+    ],
+    "secondary": [
+      "glutes",
+      "calves"
+    ],
+    "view": "front",
+    "focus": "lower"
+  },
+  "cuerda de combate": {
+    "primary": [
+      "front_deltoid"
+    ],
+    "secondary": [
+      "abs",
+      "obliques",
+      "forearm"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "remo ergometro": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "quadriceps",
+      "glutes",
+      "biceps"
+    ],
+    "view": "back",
+    "focus": "full"
+  },
+  "paseo del granjero con kettlebells": {
+    "primary": [
+      "abs",
+      "obliques"
+    ],
+    "secondary": [
+      "forearm",
+      "trapezius",
+      "glutes"
+    ],
+    "view": "front",
+    "focus": "full"
+  },
+  "elevacion de piernas colgado": {
+    "primary": [
+      "abs"
+    ],
+    "secondary": [
+      "obliques"
+    ],
+    "view": "front",
+    "focus": "upper"
+  },
+  "elevacion de gemelos en jaula": {
+    "primary": [
+      "calves"
+    ],
+    "secondary": [],
+    "view": "back",
+    "focus": "lower"
+  },
+  "remo con barra": {
+    "primary": [
+      "lats"
+    ],
+    "secondary": [
+      "rear_deltoid",
+      "biceps",
+      "lower_back"
+    ],
+    "view": "back",
+    "focus": "upper"
+  },
+  "pallof press con goma": {
+    "primary": [
+      "obliques"
+    ],
+    "secondary": [
+      "abs"
+    ],
+    "view": "front",
+    "focus": "upper"
+  }
 }

@@ -49,6 +49,8 @@ export interface Routine {
   day_order: number;
   is_active: boolean;
   created_at: string;
+  session_label?: string | null;
+  location?: 'gimnasio' | 'casa' | string;
   exercises?: RoutineExercise[];
 }
 
@@ -190,6 +192,7 @@ export interface SubstituteOption {
   times_used: number;
   always_in_routine: boolean;
   unavailable_equipment: boolean;
+  home_doable?: boolean | null;
   suggested_weight_kg?: number | null;
   suggested_reps?: number | null;
 }

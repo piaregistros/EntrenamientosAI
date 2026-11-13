@@ -234,7 +234,7 @@ export default function DietView({ user }: { user: any }) {
           {!profile.weight_kg && (
             <p className="text-xs text-amber-200">Pon tu peso. Si no, la semana no es tuya.</p>
           )}
-          <p className="text-xs text-neutral-500">Estas calorías son de tu peso, no de otra cuenta.</p>
+          <p className="text-xs text-neutral-500">Las calorías se calculan con el peso de esta cuenta, no con el de otra persona.</p>
           <input type="number" defaultValue={profile.weight_kg || ''} placeholder="Peso kg"
             className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3"
             onBlur={(e) => { if (e.target.value) saveProfile({ weight_kg: Number(e.target.value) }); }} />

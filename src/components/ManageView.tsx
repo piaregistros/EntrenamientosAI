@@ -28,6 +28,7 @@ export default function ManageView({ user, onBack }: Props) {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [newRoutineName, setNewRoutineName] = useState('');
+  const [newRoutineLocation, setNewRoutineLocation] = useState<'gimnasio' | 'casa'>('gimnasio');
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [addQuery, setAddQuery] = useState('');
@@ -78,7 +79,7 @@ export default function ManageView({ user, onBack }: Props) {
   const createRoutine = async () => {
     const name = newRoutineName.trim();
     if (!name) return;
-    const ok = await run(() => apiFetch('/api/routines', json('POST', { name, user_id: user.id })), 'Rutina creada', 'No se pudo crear la rutina', async () => {
+    const ok = await run(() => apiFetch('/api/routines', json('POST', { name, user_id: user.id, location: newRoutineLocation })), 'Rutina creada', 'No se pudo crear la rutina', async () => {
       setNewRoutineName('');
       await loadRoutines();
     });
@@ -191,6 +192,11 @@ export default function ManageView({ user, onBack }: Props) {
         <div className="space-y-3">
           <div className="flex gap-2">
             <input id="input-new-routine" className={inputCls} value={newRoutineName} onChange={(e) => setNewRoutineName(e.target.value)} placeholder="Nombre de la nueva rutina" />
+            <select id="select-new-routine-location" value={newRoutineLocation} onChange={(e) => setNewRoutineLocation(e.target.value as 'gimnasio' | 'casa')}
+              className="bg-neutral-950 border border-neutral-800 rounded-xl px-2 text-xs text-white">
+              <option value="gimnasio">Gimnasio</option>
+              <option value="casa">Casa</option>
+            </select>
             <button type="button" id="btn-create-routine" disabled={busy || !newRoutineName.trim()} onClick={createRoutine}
               className="bg-lime-400 text-black font-extrabold text-xs px-3 rounded-xl flex items-center gap-1 disabled:opacity-50"><Plus size={14} /> Crear</button>
           </div>
@@ -205,7 +211,12 @@ export default function ManageView({ user, onBack }: Props) {
               ) : (
                 <>
                   <button type="button" className="flex-1 text-left" onClick={() => loadRoutine(r.id)}>
-                    <p className="text-sm font-extrabold text-white">{r.name}</p>
+                    <p className="text-sm font-extrabold text-white flex items-center gap-2">
+                      {r.name}
+                      {r.location === 'casa' && (
+                        <span className="text-[9px] font-extrabold uppercase tracking-wide bg-lime-400/15 text-lime-400 border border-lime-400/30 rounded-full px-1.5 py-0.5">Casa</span>
+                      )}
+                    </p>
                     <p className="text-[10px] text-neutral-500">{r.session_label || `Día ${r.day_order}`} · tocar para editar ejercicios</p>
                   </button>
                   <button type="button" onClick={() => { setRenaming(r.id); setRenameValue(r.name); }} className="p-2 text-neutral-400"><Pencil size={15} /></button>
@@ -221,7 +232,13 @@ export default function ManageView({ user, onBack }: Props) {
       {tab === 'routines' && openRoutine && (
         <div className="space-y-3">
           <button type="button" onClick={() => setOpenRoutine(null)} className="text-xs text-neutral-400 flex items-center gap-1"><ArrowLeft size={12} /> Todas las rutinas</button>
-          <h3 className="text-base font-extrabold text-white">{openRoutine.name}</h3>
+          <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+            {openRoutine.name}
+            {openRoutine.location === 'casa' && (
+              <span className="text-[9px] font-extrabold uppercase tracking-wide bg-lime-400/15 text-lime-400 border border-lime-400/30 rounded-full px-1.5 py-0.5">Casa</span>
+            )}
+          </h3>
+
           {(openRoutine.exercises || []).map((re: any, i: number) => (
             <div key={re.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 space-y-2">
               <div className="flex items-center gap-2">

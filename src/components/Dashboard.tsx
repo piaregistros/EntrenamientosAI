@@ -16,6 +16,7 @@ interface DashboardProps {
 
 export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpenExerciseInfo }: DashboardProps) {
   const [routines, setRoutines] = useState<Routine[]>([]);
+  const [locationFilter, setLocationFilter] = useState<'todas' | 'gimnasio' | 'casa'>('todas');
   const [lastWorkout, setLastWorkout] = useState<WorkoutLog | null>(null);
   const [activeWorkout, setActiveWorkout] = useState<WorkoutLog | null>(null);
   const [metrics, setMetrics] = useState<BodyMetric[]>([]);
@@ -259,17 +260,21 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
     }
   };
 
-  // Determine next recommended routine
+  const locationOf = (r?: Routine | null) => (r?.location === 'casa' ? 'casa' : 'gimnasio');
+
+  const visibleRoutines = routines.filter((r) => locationFilter === 'todas' || locationOf(r) === locationFilter);
+
+  // La rotación A→B→C se hace DENTRO del mismo sitio (gimnasio o casa).
   const getNextRecommendedRoutine = () => {
     if (routines.length === 0) return null;
-    if (!lastWorkout) return routines[0]; // If first time, Routine A is recommended
-
-    const lastId = lastWorkout.routine_id;
-    const lastIndex = routines.findIndex(r => r.id === lastId);
-    if (lastIndex === -1 || lastIndex === routines.length - 1) {
-      return routines[0]; // Rotate back to first
-    }
-    return routines[lastIndex + 1]; // Next in rotation
+    const last = lastWorkout ? routines.find((r) => r.id === lastWorkout.routine_id) : undefined;
+    const groupLoc = locationFilter === 'todas' ? (last ? locationOf(last) : 'gimnasio') : locationFilter;
+    const group = routines.filter((r) => locationOf(r) === groupLoc);
+    const seq = (group.length ? group : visibleRoutines).length ? (group.length ? group : visibleRoutines) : routines;
+    if (!lastWorkout || !seq.some((r) => r.id === lastWorkout.routine_id)) return seq[0];
+    const lastIndex = seq.findIndex((r) => r.id === lastWorkout.routine_id);
+    if (lastIndex === -1 || lastIndex === seq.length - 1) return seq[0];
+    return seq[lastIndex + 1];
   };
 
   const recommendedRoutine = getNextRecommendedRoutine();
@@ -372,23 +377,48 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
       {/* Routine list switcher */}
       <div className="space-y-3">
         <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Elegir Rutina</h4>
+        <div className="grid grid-cols-3 gap-1.5">
+          {([
+            ['todas', 'Todas'],
+            ['gimnasio', 'Gimnasio'],
+            ['casa', 'Casa'],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              id={`filter-location-${key}`}
+              onClick={() => setLocationFilter(key)}
+              className={`py-2 rounded-xl text-[11px] font-extrabold border ${locationFilter === key ? 'bg-lime-400 text-black border-lime-400' : 'bg-neutral-900 text-neutral-300 border-neutral-800'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="grid grid-cols-3 gap-2.5">
-          {routines.map((routine) => (
+          {visibleRoutines.map((routine) => (
             <button
               key={routine.id}
               id={`select-routine-${routine.id}`}
               onClick={() => openRoutine(routine)}
               className="bg-neutral-900 border border-neutral-800 hover:border-neutral-700 p-3.5 rounded-xl flex flex-col justify-between items-start transition-all active:scale-95 text-left min-h-24 relative"
             >
-              <span className="text-[10px] font-bold text-lime-400 uppercase tracking-wide">Rutina {routine.day_order}</span>
+              <div className="flex items-center justify-between w-full gap-1">
+                <span className="text-[10px] font-bold text-lime-400 uppercase tracking-wide">Rutina {routine.day_order}</span>
+                {locationOf(routine) === 'casa' && (
+                  <span className="text-[9px] font-extrabold uppercase tracking-wide bg-lime-400/15 text-lime-400 border border-lime-400/30 rounded-full px-1.5 py-0.5">Casa</span>
+                )}
+              </div>
               <span className="text-sm font-extrabold text-white leading-tight">{routine.name}</span>
-              {(routine as any).session_label && (
-                <span className="text-[10px] text-neutral-300">{(routine as any).session_label}</span>
+              {routine.session_label && (
+                <span className="text-[10px] text-neutral-300">{routine.session_label}</span>
               )}
               <span className="text-[9px] text-neutral-500 mt-1 block">Toca para ver</span>
             </button>
           ))}
         </div>
+        {visibleRoutines.length === 0 && (
+          <p className="text-xs text-neutral-500">No hay rutinas en {locationFilter === 'casa' ? 'casa' : 'el gimnasio'}.</p>
+        )}
       </div>
 
       <ActivitiesPanel />

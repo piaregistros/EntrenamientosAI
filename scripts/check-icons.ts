@@ -25,7 +25,7 @@ function assertHighlight(label: string, h: MuscleHighlight) {
   }
 }
 
-if (exercises.length !== 59) fail(`el snapshot del catálogo tiene ${exercises.length} ejercicios (esperados 59)`);
+if (exercises.length === 0) fail('el snapshot del catálogo está vacío');
 const catalogNames = new Set(exercises.map((e) => normalizeExerciseName(e.name)));
 for (const e of exercises) {
   const n = normalizeExerciseName(e.name);

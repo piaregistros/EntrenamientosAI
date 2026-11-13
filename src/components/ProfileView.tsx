@@ -4,6 +4,7 @@ import { BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
 import ThemeToggle from './ThemeToggle';
 import RestPushSettings from './RestPushSettings';
+import HomeEquipmentSettings from './HomeEquipmentSettings';
 const ManageView = lazy(() => import('./ManageView'));
 
 interface ProfileViewProps {
@@ -315,7 +316,7 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
       {user.role === 'admin' && (
         <div id="admin-new-user" className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-3">
           <h3 className="text-sm font-extrabold text-white">Nuevo usuario</h3>
-          <p className="text-[11px] text-neutral-500">Le pones una clave. Al entrar la cambia y hace el test.</p>
+          <p className="text-[11px] text-neutral-500">Asigna una contraseña inicial. La primera vez que entre, tendrá que cambiarla y completar el cuestionario inicial.</p>
           <input value={newUserName} onChange={(e) => setNewUserName(e.target.value)} placeholder="Nombre" className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white" />
           <input value={newUserPass} onChange={(e) => setNewUserPass(e.target.value)} placeholder="Contraseña inicial" type="text" className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white" />
           <button type="button" onClick={createUser} className="w-full bg-lime-400 text-black font-extrabold rounded-xl py-2.5 text-sm">Crear usuario</button>
@@ -345,6 +346,7 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
       )}
 
       <ThemeToggle />
+      <HomeEquipmentSettings />
       <RestPushSettings />
       <button type="button" id="btn-open-manage" onClick={() => setShowManage(true)}
         className="w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-left">
