@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Crunch</title>
+  <path d="M 6 50 H 58" stroke-width="2.0"/>
+  <circle cx="16.0" cy="26.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 20 30 L 30 46"/>
+  <path d="M 30 46 L 44 34 L 50 50"/>
+</svg>

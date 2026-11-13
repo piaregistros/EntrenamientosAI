@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Peso muerto rumano</title>
+  <path d="M 24 56 H 44"/>
+  <path d="M 34 56 L 36 42"/>
+  <path d="M 36 42 L 28 40"/>
+  <path d="M 28 40 L 16 24"/>
+  <circle cx="13.0" cy="18.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 18 26 L 30 44"/>
+  <line x1="14.0" y1="44.0" x2="46.0" y2="44.0" stroke-width="2.4"/>
+  <circle cx="14.0" cy="44.0" r="3.2" stroke-width="2.2"/>
+  <circle cx="46.0" cy="44.0" r="3.2" stroke-width="2.2"/>
+  <circle cx="14.0" cy="44.0" r="1.7000000000000002" stroke-width="1.8"/>
+  <circle cx="46.0" cy="44.0" r="1.7000000000000002" stroke-width="1.8"/>
+</svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Elevaciones laterales</title>
+  <circle cx="32.0" cy="10.5" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 32 15 V 40"/>
+  <path d="M 32 40 L 23 57"/>
+  <path d="M 32 40 L 41 57"/>
+  <path d="M 32 20 L 9 24"/>
+  <path d="M 32 20 L 55 24"/>
+  <line x1="4.7" y1="22.4" x2="13.3" y2="25.6" stroke-width="2.2"/>
+  <circle cx="4.7" cy="22.4" r="2.15" stroke-width="2.0"/>
+  <circle cx="13.3" cy="25.6" r="2.15" stroke-width="2.0"/>
+  <line x1="50.7" y1="25.6" x2="59.3" y2="22.4" stroke-width="2.2"/>
+  <circle cx="50.7" cy="25.6" r="2.15" stroke-width="2.0"/>
+  <circle cx="59.3" cy="22.4" r="2.15" stroke-width="2.0"/>
+</svg>

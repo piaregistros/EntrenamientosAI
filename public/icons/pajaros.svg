@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Pájaros (deltoides posterior)</title>
+  <path d="M 24 42 H 46"/>
+  <path d="M 44 22 V 42" stroke-width="2.2"/>
+  <circle cx="36.0" cy="16.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 36 20.5 V 42"/>
+  <path d="M 36 42 L 30 57"/>
+  <path d="M 36 42 L 44 57"/>
+  <path d="M 34 24 L 16 18"/>
+  <line x1="11.9" y1="16.5" x2="20.1" y2="19.5" stroke-width="2.2"/>
+  <circle cx="11.9" cy="16.5" r="2.15" stroke-width="2.0"/>
+  <circle cx="20.1" cy="19.5" r="2.15" stroke-width="2.0"/>
+</svg>

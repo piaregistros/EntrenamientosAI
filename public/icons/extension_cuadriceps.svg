@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Extensión de cuádriceps</title>
+  <path d="M 16 20 V 40 H 38"/>
+  <path d="M 16 40 V 48"/>
+  <circle cx="20.0" cy="14.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 20 18.5 V 40"/>
+  <path d="M 20 40 H 40"/>
+  <path d="M 40 40 L 54 30"/>
+  <path d="M 50 28 L 58 34" stroke-width="2.4"/>
+</svg>

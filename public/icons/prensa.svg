@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Prensa de piernas</title>
+  <path d="M 8 22 L 26 46"/>
+  <path d="M 8 46 H 28"/>
+  <path d="M 36 52 L 58 22" stroke-width="2.2"/>
+  <circle cx="11.0" cy="20.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 14 24 L 26 42"/>
+  <path d="M 26 42 L 42 32 L 52 22"/>
+  <path d="M 46 28 L 56 18" stroke-width="2.4"/>
+</svg>

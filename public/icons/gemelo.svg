@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Elevación de gemelos</title>
+  <path d="M 14 56 H 50"/>
+  <path d="M 20 16 H 44" stroke-width="2.4"/>
+  <circle cx="32.0" cy="9.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 32 14 V 36"/>
+  <path d="M 32 36 L 36 52"/>
+  <path d="M 26 44 L 40 54"/>
+</svg>

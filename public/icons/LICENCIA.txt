@@ -1,0 +1,10 @@
+Pictogramas de ejercicio (Fase 9)
+================================
+Dibujo original de trazo, creado para EntrenamientosAI.
+No se utiliza ningún set de iconos de terceros.
+
+Se pueden usar, copiar y modificar junto con esta aplicación.
+El fichero SVG usa trazo negro (#000) para que la interfaz pueda
+pintarlo con currentColor (modo claro y modo oscuro) mediante una máscara CSS.
+
+Para regenerarlos: python3 scripts/generate-icons.py

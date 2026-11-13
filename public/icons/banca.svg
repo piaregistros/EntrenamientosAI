@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Press banca con barra</title>
+  <path d="M 8 42 H 56"/>
+  <path d="M 16 42 V 57"/>
+  <path d="M 50 42 V 57"/>
+  <circle cx="14.0" cy="34.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 18.5 36.5 H 42"/>
+  <path d="M 42 36.5 L 50 42 L 57 40"/>
+  <path d="M 32 36.5 V 17"/>
+  <line x1="16.0" y1="15.0" x2="48.0" y2="15.0" stroke-width="2.4"/>
+  <circle cx="16.0" cy="15.0" r="3.2" stroke-width="2.2"/>
+  <circle cx="48.0" cy="15.0" r="3.2" stroke-width="2.2"/>
+  <circle cx="16.0" cy="15.0" r="1.7000000000000002" stroke-width="1.8"/>
+  <circle cx="48.0" cy="15.0" r="1.7000000000000002" stroke-width="1.8"/>
+</svg>

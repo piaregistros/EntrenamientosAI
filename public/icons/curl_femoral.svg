@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Curl femoral</title>
+  <path d="M 6 36 H 48"/>
+  <path d="M 12 36 V 52"/>
+  <path d="M 42 36 V 52"/>
+  <circle cx="12.0" cy="28.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 16 30 H 40"/>
+  <path d="M 40 32 L 46 16 L 32 12"/>
+  <path d="M 28 11 L 36 15" stroke-width="2.4"/>
+</svg>

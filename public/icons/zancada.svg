@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Zancada / sentadilla búlgara / step-up</title>
+  <circle cx="30.0" cy="11.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 30 15.5 V 36"/>
+  <path d="M 30 36 L 44 36 L 46 56"/>
+  <path d="M 38 56 H 52"/>
+  <path d="M 30 36 L 16 50 L 12 56"/>
+  <path d="M 8 56 H 18"/>
+  <line x1="24.0" y1="27.8" x2="24.0" y2="36.2" stroke-width="2.2"/>
+  <circle cx="24.0" cy="27.8" r="2.15" stroke-width="2.0"/>
+  <circle cx="24.0" cy="36.2" r="2.15" stroke-width="2.0"/>
+</svg>

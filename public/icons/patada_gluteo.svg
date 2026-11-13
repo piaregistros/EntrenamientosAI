@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Patada de glúteo / extensión de cadera</title>
+  <path d="M 6 50 H 40" stroke-width="2.0"/>
+  <circle cx="12.0" cy="30.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 16 34 L 34 36"/>
+  <path d="M 16 34 L 16 50"/>
+  <path d="M 34 36 L 32 50"/>
+  <path d="M 34 36 L 54 24"/>
+</svg>

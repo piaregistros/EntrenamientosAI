@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Plancha</title>
+  <path d="M 6 50 H 58" stroke-width="2.0"/>
+  <circle cx="11.0" cy="33.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 15 37 H 50"/>
+  <path d="M 16 37 V 50"/>
+  <path d="M 16 50 H 24"/>
+  <path d="M 50 37 L 52 50"/>
+</svg>

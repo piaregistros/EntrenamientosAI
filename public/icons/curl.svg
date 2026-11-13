@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Curl de bíceps</title>
+  <circle cx="26.0" cy="11.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 26 15.5 V 40"/>
+  <path d="M 26 40 L 20 57"/>
+  <path d="M 26 40 L 34 57"/>
+  <path d="M 28 20 L 32 33 L 43 23"/>
+  <line x1="38.5" y1="20.9" x2="47.5" y2="25.1" stroke-width="2.2"/>
+  <circle cx="38.5" cy="20.9" r="2.15" stroke-width="2.0"/>
+  <circle cx="47.5" cy="25.1" r="2.15" stroke-width="2.0"/>
+</svg>

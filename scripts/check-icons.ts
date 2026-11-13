@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  EXERCISE_ICON_BY_NAME, ICON_BY_MUSCLE, ICON_BY_PATTERN, ICON_DIR, ICON_KEYS,
+  EXERCISE_ICON_BY_NAME, ICON_BY_MUSCLE, ICON_BY_PATTERN, ICON_DIR, ICON_EXT, ICON_KEYS,
   normalizeExerciseName, resolveExerciseIcon, exerciseIconSrc,
 } from '../src/lib/exerciseIcons';
 import catalog from './catalog-snapshot.json';
@@ -14,21 +14,20 @@ const exercises = catalog as Ex[];
 // Lógica ANTIGUA de WorkoutActive.tsx (palabras sueltas del nombre), solo para comparar «antes».
 function legacyIcon(name: string): string {
   const n = normalizeExerciseName(name);
-  const f = (x: string) => x;
-  if (n.includes('plancha') || n.includes('crunch') || n.includes('rodilla') || n.includes('pallof')) return f('plancha');
-  if (n.includes('prensa')) return f('prensa');
-  if (n.includes('femoral') || n.includes('peso muerto') || n.includes('hip') || n.includes('patada') || n.includes('abduc') || n.includes('cadera')) return f('hip');
-  if (n.includes('jalon') || n.includes('estirar') || n.includes('pullover')) return f('jalon');
-  if (n.includes('remo')) return f('remo');
-  if (n.includes('lateral')) return f('lateral');
-  if (n.includes('gemelo')) return f('gemelo');
-  if (n.includes('tricep') || n.includes('frances')) return f('triceps');
-  if (n.includes('curl') || n.includes('bicep') || n.includes('martillo')) return f('curl');
-  if (n.includes('hombro') || n.includes('militar') || n.includes('pajaro') || n.includes('face')) return f('hombro');
-  if (n.includes('banca') || n.includes('apertura') || n.includes('cruce') || n.includes('convergente') || (n.includes('inclinado') && !n.includes('curl'))) return f('banca');
-  if (n.includes('sentadilla') || n.includes('zancada') || n.includes('hack') || n.includes('goblet') || n.includes('step')) return f('sentadilla');
-  if (n.includes('cuadricep')) return f('sentadilla');
-  return f('prensa');
+  if (n.includes('plancha') || n.includes('crunch') || n.includes('rodilla') || n.includes('pallof')) return 'plancha';
+  if (n.includes('prensa')) return 'prensa';
+  if (n.includes('femoral') || n.includes('peso muerto') || n.includes('hip') || n.includes('patada') || n.includes('abduc') || n.includes('cadera')) return 'hip';
+  if (n.includes('jalon') || n.includes('estirar') || n.includes('pullover')) return 'jalon';
+  if (n.includes('remo')) return 'remo';
+  if (n.includes('lateral')) return 'lateral';
+  if (n.includes('gemelo')) return 'gemelo';
+  if (n.includes('tricep') || n.includes('frances')) return 'triceps';
+  if (n.includes('curl') || n.includes('bicep') || n.includes('martillo')) return 'curl';
+  if (n.includes('hombro') || n.includes('militar') || n.includes('pajaro') || n.includes('face')) return 'hombro';
+  if (n.includes('banca') || n.includes('apertura') || n.includes('cruce') || n.includes('convergente') || (n.includes('inclinado') && !n.includes('curl'))) return 'banca';
+  if (n.includes('sentadilla') || n.includes('zancada') || n.includes('hack') || n.includes('goblet') || n.includes('step')) return 'sentadilla';
+  if (n.includes('cuadricep')) return 'sentadilla';
+  return 'prensa';
 }
 
 const errors: string[] = [];
@@ -46,27 +45,30 @@ for (const e of exercises) {
 for (const k of Object.keys(EXERCISE_ICON_BY_NAME)) {
   if (!catalogNames.has(k)) fail(`entrada del mapa que no es del catálogo: ${k}`);
 }
-// 2. Todos los valores son claves válidas y los ficheros existen.
+// 2. Todos los valores son claves válidas y los ficheros SVG existen.
 for (const [k, v] of Object.entries({ ...EXERCISE_ICON_BY_NAME, ...ICON_BY_PATTERN })) {
   if (!ICON_KEYS.includes(v)) fail(`icono desconocido «${v}» para ${k}`);
 }
 for (const [, v] of ICON_BY_MUSCLE) if (!ICON_KEYS.includes(v)) fail(`icono desconocido «${v}» en ICON_BY_MUSCLE`);
 for (const key of ICON_KEYS) {
-  const file = path.join(publicDir, `${key}.jpg`);
-  if (!fs.existsSync(file) || fs.statSync(file).size < 1000) fail(`falta el fichero ${file}`);
+  const file = path.join(publicDir, `${key}${ICON_EXT}`);
+  if (!fs.existsSync(file)) { fail(`falta el fichero ${file}`); continue; }
+  const body = fs.readFileSync(file, 'utf8');
+  if (!body.includes('<svg') || body.length < 200) fail(`el fichero ${file} no parece un SVG válido`);
 }
 // 3. Coherencia: el icono explícito de cada ejercicio es el de su patrón o su músculo, o está justificado.
 //    (Excepciones deliberadas: se elige por el gesto, no por el patrón.)
 const DELIBERATE: Record<string, string> = {
-  'face pull': 'remo (tracción horizontal con polea; el icono de hombro es una máquina de press)',
-  'pajaros en maquina': 'lateral (misma máquina sentada con brazos abiertos)',
-  'extension de cuadriceps': 'prensa (máquina de pierna)',
-  'curl femoral': 'hip (cadera posterior)', 'curl femoral sentado': 'hip', 'curl femoral tumbado': 'hip',
-  'cruce de poleas': 'banca (pecho)', 'aperturas de pecho en maquina': 'banca (pecho)',
-  'hack squat': 'sentadilla', 'pullover en polea': 'jalon', 'press militar con barra': 'hombro',
-  'sentadilla bulgara': 'sentadilla', 'zancadas': 'sentadilla', 'step-up': 'sentadilla',
-  'prensa unilateral': 'prensa', 'prensa de piernas': 'prensa',
+  'face pull': 'face_pull (tracción a la cara; el patrón genérico sería remo)',
+  'prensa de piernas': 'prensa (máquina de empuje; el patrón del catálogo es sentadilla)',
+  'prensa unilateral': 'prensa (máquina de empuje; el patrón del catálogo es sentadilla)',
+  'sentadilla bulgara': 'zancada (apoyo en una pierna / split; el patrón del catálogo es sentadilla)',
+  'patada de gluteo en polea': 'patada_gluteo (la extensión de cadera genérica usa hip thrust)',
+  'extension de cadera en maquina': 'patada_gluteo (la extensión de cadera genérica usa hip thrust)',
+  'extension de triceps por encima de la cabeza': 'triceps_alto (el patrón genérico de extensión de codo es el jalón hacia abajo)',
+  'press frances': 'triceps_alto (el patrón genérico de extensión de codo es el jalón hacia abajo)',
 };
+
 for (const e of exercises) {
   const n = normalizeExerciseName(e.name);
   const explicit = EXERCISE_ICON_BY_NAME[n];
@@ -77,9 +79,19 @@ for (const e of exercises) {
 }
 // 4. El grupo muscular nunca se contradice: un ejercicio de pecho no puede llevar el icono de otra región.
 const REGION: Record<string, string[]> = {
-  pectoral: ['banca'], deltoides: ['hombro', 'lateral'], dorsal: ['jalon', 'remo'], espalda: ['remo', 'jalon', 'lateral'],
-  triceps: ['triceps'], biceps: ['curl'], braquial: ['curl'], gluteo: ['hip'], isquio: ['hip'],
-  cuadriceps: ['prensa', 'sentadilla'], gemelo: ['gemelo'], core: ['plancha'], abdominal: ['plancha'],
+  pectoral: ['banca', 'aperturas'],
+  deltoides: ['hombro', 'lateral', 'pajaros', 'face_pull'],
+  dorsal: ['jalon', 'remo', 'pullover'],
+  espalda: ['remo', 'jalon', 'pullover', 'pajaros', 'face_pull'],
+  triceps: ['triceps', 'triceps_alto'],
+  biceps: ['curl'],
+  braquial: ['curl'],
+  gluteo: ['hip', 'patada_gluteo', 'abduccion', 'peso_muerto', 'sentadilla', 'zancada', 'prensa'],
+  isquio: ['curl_femoral', 'peso_muerto', 'hip'],
+  cuadriceps: ['prensa', 'sentadilla', 'zancada', 'extension_cuadriceps'],
+  gemelo: ['gemelo'],
+  core: ['plancha', 'pallof', 'crunch', 'elevacion_rodillas'],
+  abdominal: ['plancha', 'crunch', 'elevacion_rodillas', 'pallof'],
 };
 for (const e of exercises) {
   const muscle = normalizeExerciseName(e.target_muscle);
@@ -102,6 +114,7 @@ for (const [label, ex, expected] of probes) {
   if (got !== expected) fail(`fallback ${label}: esperado ${expected}, obtenido ${got}`);
 }
 if (exerciseIconSrc({ name: 'Ejercicio inventado' }) !== null) fail('exerciseIconSrc debe devolver null sin coincidencia');
+if (!exerciseIconSrc({ name: 'Press banca plano' })?.includes(ICON_EXT)) fail('exerciseIconSrc debe apuntar a un .svg');
 
 if (process.argv.includes('--table')) {
   console.log('| # | Ejercicio | Músculo | Antes | Después | Cambio |');
@@ -117,4 +130,4 @@ if (errors.length) {
   console.error(`✗ ${errors.length} problema(s) en el mapeo de iconos:\n - ` + errors.join('\n - '));
   process.exit(1);
 }
-console.log(`✓ iconos OK: ${exercises.length} ejercicios con icono explícito, ${ICON_KEYS.length} ilustraciones existentes`);
+console.log(`✓ iconos OK: ${exercises.length} ejercicios con icono explícito, ${ICON_KEYS.length} pictogramas SVG existentes`);

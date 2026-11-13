@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Pullover en polea</title>
+  <line x1="52.0" y1="3.0" x2="46.0" y2="18.0" stroke-width="2.0"/>
+  <circle cx="22.0" cy="14.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 23 18.5 L 27 40"/>
+  <path d="M 27 40 L 20 57"/>
+  <path d="M 27 40 L 36 57"/>
+  <path d="M 25 21 Q 34 6 46 18"/>
+  <circle cx="46.0" cy="18.0" r="1.6" fill="#000" stroke="none"/>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="#000" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+  <title>Extensión de tríceps por encima de la cabeza</title>
+  <circle cx="38.0" cy="22.0" r="4.3" fill="#000" stroke="none"/>
+  <path d="M 36 26.5 V 42"/>
+  <path d="M 36 42 L 27 57"/>
+  <path d="M 36 42 L 45 57"/>
+  <path d="M 34 24 L 30 8 L 16 18"/>
+  <line x1="14.0" y1="13.6" x2="18.0" y2="22.4" stroke-width="2.2"/>
+  <circle cx="14.0" cy="13.6" r="2.3" stroke-width="2.0"/>
+  <circle cx="18.0" cy="22.4" r="2.3" stroke-width="2.0"/>
+</svg>
