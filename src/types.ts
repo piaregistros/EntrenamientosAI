@@ -203,3 +203,28 @@ export interface SubstituteResponse {
   unavailable_equipment: string[];
   substitutions: SubstituteOption[];
 }
+
+// Fase 8: aviso de estancamiento / deload (GET /api/progress/stagnation)
+export interface StagnationItem {
+  exercise_id: string;
+  name: string;
+  equipment?: string | null;
+  exercise_type?: string | null;
+  target_muscle?: string | null;
+  kind: 'plateau' | 'fail_streak';
+  sessions_without_progress: number;
+  fail_streak: number;
+  last_weight_kg: number | null;
+  last_min_reps: number | null;
+  measure_type?: string | null;
+  unit?: 'reps' | 's' | string;
+  suggested_deload_kg: number | null;
+  suggestion: 'deload_or_swap' | 'swap' | string;
+  reason: string;
+  progression_kind?: string | null;
+}
+
+export interface StagnationResponse {
+  items: StagnationItem[];
+  count: number;
+}

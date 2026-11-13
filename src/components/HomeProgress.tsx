@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
+import { fmtKg } from '../lib/measure';
+import { StagnationItem } from '../types';
 
 type Home = {
   tomorrow: string;
@@ -10,6 +12,7 @@ type Home = {
   streak_7: number;
   streak_28: number;
   loads: Record<string, { next_weight_kg: number; reason: string }>;
+  stagnation?: StagnationItem[];
 };
 
 
@@ -44,6 +47,7 @@ export default function HomeProgress({
   onStart: (routineId: string) => void;
 }) {
   const [home, setHome] = useState<Home | null>(null);
+  const [stagnation, setStagnation] = useState<StagnationItem[]>([]);
   const [stats, setStats] = useState<{ volume_7d: { muscle: string; sets: number }[]; e1rm: { name: string; e1rm: number }[] } | null>(null);
   const [openStats, setOpenStats] = useState(false);
 
@@ -51,8 +55,15 @@ export default function HomeProgress({
     if (!userId) return;
     apiFetch(`/api/progress/home?user_id=${encodeURIComponent(userId)}`)
       .then((r) => r.json())
-      .then(setHome)
+      .then((data: Home) => {
+        setHome(data);
+        if (Array.isArray(data?.stagnation)) setStagnation(data.stagnation);
+      })
       .catch(() => setHome(null));
+    apiFetch(`/api/progress/stagnation?user_id=${encodeURIComponent(userId)}`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => setStagnation(Array.isArray(data?.items) ? data.items : []))
+      .catch(() => { /* si falla, se usa lo que venga en /home */ });
   }, [userId]);
 
   const loadStats = async () => {
@@ -77,6 +88,27 @@ export default function HomeProgress({
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-200">
           <p className="font-bold">Se pisan con el último entreno</p>
           <p className="mt-1">{home.overlap.join(', ')}</p>
+        </div>
+      )}
+      {stagnation.length > 0 && (
+        <div id="stagnation-alerts" className="rounded-xl border border-orange-500/40 bg-orange-500/10 p-3 text-[11px] text-orange-100 space-y-2">
+          <p className="font-bold text-orange-200">
+            {stagnation.length === 1 ? 'Un ejercicio está estancado' : `${stagnation.length} ejercicios estancados`}
+          </p>
+          {stagnation.slice(0, 6).map((s) => (
+            <div key={s.exercise_id} className="border-t border-orange-500/20 pt-2 first:border-0 first:pt-0">
+              <p className="font-bold text-white">{s.name}</p>
+              <p className="mt-0.5 text-orange-100/90">{s.reason}</p>
+              {s.suggested_deload_kg != null && (
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-orange-200">
+                  Deload sugerido: {fmtKg(s.suggested_deload_kg)} kg
+                </p>
+              )}
+            </div>
+          ))}
+          <p className="text-[10px] text-orange-200/80">
+            Al empezar el entreno verás el aviso en el ejercicio y podrás sustituirlo.
+          </p>
         </div>
       )}
       <p className="text-[11px] text-neutral-400">

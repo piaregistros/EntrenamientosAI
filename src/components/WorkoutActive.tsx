@@ -3,10 +3,11 @@ import { Play, Dumbbell, Timer, ArrowRight, ArrowLeft, Plus, Check, Trash2, Refr
 // share icons added below if missing
 
 import { motion, AnimatePresence } from 'motion/react';
-import { Exercise, Routine, RoutineExercise, WorkoutLog, WorkoutSet, ExerciseSubstitution, SubstituteResponse, SubstituteOption } from '../types';
+import { Exercise, Routine, RoutineExercise, WorkoutLog, WorkoutSet, ExerciseSubstitution, SubstituteResponse, SubstituteOption, StagnationItem } from '../types';
 import { apiFetch } from '../lib/api';
 import { isTimedExercise, rememberMeasure, fmtKg } from '../lib/measure';
 import { rebuildSessionExercises } from '../lib/rebuildSession';
+import { REST_MIN, REST_STEP, formatRest, rememberExerciseRest, resolveRestSeconds } from '../lib/restTimer';
 import ExerciseIcon from './ExerciseIcon';
 
 interface WorkoutActiveProps {
@@ -74,6 +75,7 @@ export default function WorkoutActive({
   const [subLoading, setSubLoading] = useState(false);
   const [subAlways, setSubAlways] = useState(false);
   const [substitutionsMap, setSubstitutionsMap] = useState<Record<string, RoutineExercise>>({});
+  const [stagnation, setStagnation] = useState<StagnationItem[]>([]);
 
   // Loading states
   const [loading, setLoading] = useState(true);
@@ -86,6 +88,16 @@ export default function WorkoutActive({
   const audioContextRef = useRef<AudioContext | null>(null);
   const workoutStartMsRef = useRef<number | null>(null);
   const restEndsAtMsRef = useRef<number | null>(null);
+
+  const announceRestDone = () => {
+    playTimerDoneSound();
+    try {
+      const vibrate = (navigator as any).vibrate;
+      if (typeof vibrate === 'function') vibrate.call(navigator, [200, 80, 200]);
+    } catch {
+      // El dispositivo no admite vibración o el usuario no lo ha concedido.
+    }
+  };
 
   const playTimerDoneSound = () => {
     try {
@@ -113,10 +125,22 @@ export default function WorkoutActive({
     startWorkoutSession();
   }, [routineId, existingWorkoutId]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    apiFetch(`/api/progress/stagnation?user_id=${encodeURIComponent(user.id)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => setStagnation(Array.isArray(data?.items) ? data.items : []))
+      .catch(() => setStagnation([]));
+  }, [user?.id]);
+
   const syncElapsedFromClock = () => {
     const start = workoutStartMsRef.current;
     if (!start) return;
     setElapsedSeconds(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+  };
+
+  const persistRestEnds = (ends: number, total: number) => {
+    try { sessionStorage.setItem('entreno-rest-ends', JSON.stringify({ ends, total })); } catch {}
   };
 
   const syncRestFromClock = () => {
@@ -127,7 +151,7 @@ export default function WorkoutActive({
       restEndsAtMsRef.current = null;
       try { sessionStorage.removeItem('entreno-rest-ends'); } catch {}
       setRestSecondsLeft(null);
-      playTimerDoneSound();
+      announceRestDone();
     } else {
       setRestSecondsLeft(left);
     }
@@ -135,19 +159,26 @@ export default function WorkoutActive({
 
   const beginRest = (seconds: number) => {
     if (!seconds || seconds <= 0) return;
-    setTotalRestDuration(seconds);
-    const ends = Date.now() + seconds * 1000;
+    const duration = Math.max(REST_MIN, seconds);
+    setTotalRestDuration(duration);
+    const ends = Date.now() + duration * 1000;
     restEndsAtMsRef.current = ends;
-    try { sessionStorage.setItem('entreno-rest-ends', String(ends)); } catch {}
-    setRestSecondsLeft(seconds);
+    persistRestEnds(ends, duration);
+    setRestSecondsLeft(duration);
   };
 
   const addRestSeconds = (extra: number) => {
     const currentEnds = restEndsAtMsRef.current ?? (Date.now() + (restSecondsLeft || 0) * 1000);
-    const ends = currentEnds + extra * 1000;
+    const minEnds = Date.now() + REST_MIN * 1000;
+    const ends = Math.max(minEnds, currentEnds + extra * 1000);
     restEndsAtMsRef.current = ends;
-    try { sessionStorage.setItem('entreno-rest-ends', String(ends)); } catch {}
-    setRestSecondsLeft(Math.max(0, Math.ceil((ends - Date.now()) / 1000)));
+    const left = Math.max(REST_MIN, Math.ceil((ends - Date.now()) / 1000));
+    const total = extra > 0 ? Math.max(totalRestDuration, left) : totalRestDuration;
+    setTotalRestDuration(total);
+    persistRestEnds(ends, total);
+    setRestSecondsLeft(left);
+    const eid = exercises[activeExIndex]?.exercise?.id;
+    if (eid) rememberExerciseRest(eid, left);
   };
 
   const clearRest = () => {
@@ -160,10 +191,20 @@ export default function WorkoutActive({
     try {
       const saved = sessionStorage.getItem('entreno-rest-ends');
       if (saved) {
-        const ends = Number(saved);
+        let ends = 0;
+        let total = 0;
+        if (saved.startsWith('{')) {
+          const parsed = JSON.parse(saved);
+          ends = Number(parsed.ends);
+          total = Number(parsed.total) || 0;
+        } else {
+          ends = Number(saved);
+        }
         if (ends > Date.now()) {
           restEndsAtMsRef.current = ends;
-          setRestSecondsLeft(Math.ceil((ends - Date.now()) / 1000));
+          const left = Math.ceil((ends - Date.now()) / 1000);
+          setRestSecondsLeft(left);
+          setTotalRestDuration(total > 0 ? total : left);
         } else {
           sessionStorage.removeItem('entreno-rest-ends');
         }
@@ -603,10 +644,8 @@ export default function WorkoutActive({
       setLoggedSets([...loggedSets, data]);
       setSetNote(''); // clear note
 
-      // Trigger Rest Timer automatically
-      if (activeExerciseItem.rest_seconds > 0) {
-        beginRest(activeExerciseItem.rest_seconds);
-      }
+      // Temporizador de descanso automático (defaults por tipo + preferencia guardada).
+      beginRest(resolveRestSeconds(activeExerciseItem));
     } catch (err: any) {
       setError(err.message || 'Error al guardar la serie.');
     } finally {
@@ -842,6 +881,13 @@ export default function WorkoutActive({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const stagnationOf = (exerciseId?: string | null) =>
+    stagnation.find((s) => s.exercise_id === exerciseId);
+  const activeStagnation = stagnationOf(activeExercise?.id);
+  const restProgress = totalRestDuration > 0 && restSecondsLeft != null
+    ? Math.max(0, Math.min(100, (restSecondsLeft / totalRestDuration) * 100))
+    : 0;
+
   if (loading) {
     return (
       <div id="workout-active-loading" className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-lime-400">
@@ -914,6 +960,14 @@ export default function WorkoutActive({
                   )}
                   {isSubbed && (
                     <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 border border-neutral-900 rounded-full" />
+                  )}
+                  {stagnationOf(re.exercise?.id) && (
+                    <span
+                      title="Estancado"
+                      className="absolute -top-1 -left-1 bg-orange-500 text-black text-[8px] font-black uppercase tracking-wide px-1 rounded"
+                    >
+                      Estancado
+                    </span>
                   )}
                 </button>
               );
@@ -1039,6 +1093,30 @@ export default function WorkoutActive({
                 </p>
               </div>
             </div>
+
+            {activeStagnation && (
+              <div id="stagnation-badge" className="bg-orange-500/10 border border-orange-500/30 p-3 rounded-xl space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-orange-300">
+                  {activeStagnation.kind === 'fail_streak' ? 'Aviso de deload' : 'Estancamiento'}
+                </p>
+                <p className="text-[11px] text-orange-100 leading-snug">{activeStagnation.reason}</p>
+                <div className="flex flex-wrap gap-2">
+                  {activeStagnation.suggested_deload_kg != null && (
+                    <span className="text-[10px] font-bold text-orange-200 bg-orange-500/10 border border-orange-500/20 px-2 py-1 rounded-lg">
+                      Deload: {fmtKg(activeStagnation.suggested_deload_kg)} kg
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    id="btn-stagnation-substitute"
+                    onClick={() => void handleOpenSubstitutions()}
+                    className="text-[10px] font-extrabold uppercase tracking-wide text-black bg-orange-400 hover:bg-orange-300 px-2.5 py-1 rounded-lg"
+                  >
+                    Sustituir ejercicio
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Recommendations Widget (reps_then_weight) */}
             {activeRec && (
@@ -1391,35 +1469,55 @@ export default function WorkoutActive({
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 50, opacity: 0 }}
-            className="fixed bottom-4 left-4 right-4 z-40 bg-lime-400 text-black border border-lime-300 rounded-2xl p-4 shadow-2xl flex items-center justify-between select-none max-w-md mx-auto"
+            className="fixed bottom-4 left-4 right-4 z-40 bg-lime-400 text-black border border-lime-300 rounded-2xl p-4 shadow-2xl flex items-center select-none max-w-md mx-auto"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-black/10 flex items-center justify-center font-black animate-pulse">
-                {restSecondsLeft}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="min-w-[3.25rem] h-9 rounded-xl bg-black/10 flex items-center justify-center font-black tabular-nums text-sm">
+                    {formatRest(restSecondsLeft)}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-black tracking-wide uppercase">Descanso</h4>
+                    <p className="text-[10px] opacity-75 font-medium mt-0.5 truncate">Respira y prepárate para la siguiente serie</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    id="btn-timer-minus-15"
+                    type="button"
+                    onClick={() => addRestSeconds(-REST_STEP)}
+                    className="bg-black/10 hover:bg-black/15 font-bold px-2 py-1.5 rounded-lg text-[10px]"
+                    style={{ minHeight: '30px' }}
+                  >
+                    −15 s
+                  </button>
+                  <button
+                    id="btn-timer-plus-15"
+                    type="button"
+                    onClick={() => addRestSeconds(REST_STEP)}
+                    className="bg-black/10 hover:bg-black/15 font-bold px-2 py-1.5 rounded-lg text-[10px]"
+                    style={{ minHeight: '30px' }}
+                  >
+                    +15 s
+                  </button>
+                  <button
+                    id="btn-timer-skip"
+                    type="button"
+                    onClick={() => clearRest()}
+                    className="bg-black text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px]"
+                    style={{ minHeight: '30px' }}
+                  >
+                    Omitir
+                  </button>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-black tracking-wide uppercase">Temporizador de Descanso</h4>
-                <p className="text-[10px] opacity-75 font-medium mt-0.5">Respira, concéntrate y prepárate...</p>
+              <div className="mt-2 h-1.5 rounded-full bg-black/15 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-black/40 transition-[width] duration-200"
+                  style={{ width: restProgress + '%' }}
+                />
               </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                id="btn-timer-add-30"
-                onClick={() => addRestSeconds(30)}
-                className="bg-black/10 hover:bg-black/15 font-bold px-2.5 py-1.5 rounded-lg text-[10px]"
-                style={{ minHeight: '30px' }}
-              >
-                +30s
-              </button>
-              <button
-                id="btn-timer-skip"
-                onClick={() => clearRest()}
-                className="bg-black text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px]"
-                style={{ minHeight: '30px' }}
-              >
-                Omitir
-              </button>
             </div>
           </motion.div>
         )}
