@@ -367,7 +367,7 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
         </div>
       )}
 
-      {user?.id && <HomeProgress userId={user.id} onStart={onStartWorkout} />}
+      {user?.id && <HomeProgress userId={user.id} onStart={onStartWorkout} onOpenStats={() => onNavigateToTab('stats')} />}
 
       {/* Routine list switcher */}
       <div className="space-y-3">

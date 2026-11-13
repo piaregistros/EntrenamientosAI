@@ -69,6 +69,29 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Nombres con hash: el service worker hace red-primero y cachea la URL nueva.
+          chunkFileNames: 'assets/[name]-[hash].js',
+          entryFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash][extname]',
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+            if (
+              id.includes('node_modules/react-dom') ||
+              id.includes('node_modules/react/') ||
+              id.includes('node_modules/scheduler')
+            ) {
+              return 'react';
+            }
+            if (id.includes('node_modules/motion') || id.includes('node_modules/framer-motion')) {
+              return 'motion';
+            }
+          },
+        },
+      },
+    },
     server: {
       allowedHosts: true,
       hmr: process.env.DISABLE_HMR !== 'true',

@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Info, ShieldAlert, Award, Play, ExternalLink } from 'lucide-react';
 import { Exercise } from '../types';
 import { apiFetch } from '../lib/api';
 import ExerciseIcon from './ExerciseIcon';
+const ExerciseProgressChart = lazy(() => import('./ExerciseProgressChart'));
 
 interface ExerciseInfoProps {
   exercise: Exercise | null;
   isOpen: boolean;
   onClose: () => void;
+  userId?: string;
 }
 
 const getYoutubeEmbedUrl = (url: string | null | undefined): string | null => {
@@ -39,8 +41,8 @@ const getYoutubeEmbedUrl = (url: string | null | undefined): string | null => {
   return null;
 };
 
-export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfoProps) {
-  const [activeTab, setActiveTab] = useState<'ejecucion' | 'seguridad' | 'ficha'>('ejecucion');
+export default function ExerciseInfo({ exercise, isOpen, onClose, userId }: ExerciseInfoProps) {
+  const [activeTab, setActiveTab] = useState<'ejecucion' | 'seguridad' | 'ficha' | 'progreso'>('ejecucion');
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -162,7 +164,7 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
 
             {/* Navigation Tabs */}
             <div className="flex border-b border-neutral-800 px-4 bg-neutral-950/40">
-              {(['ejecucion', 'seguridad', 'ficha'] as const).map((tab) => (
+              {(['ejecucion', 'seguridad', 'ficha', 'progreso'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -173,6 +175,7 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
                   {tab === 'ejecucion' && 'Ejecución'}
                   {tab === 'seguridad' && 'Técnica y Seguridad'}
                   {tab === 'ficha' && 'Ficha Técnica'}
+                  {tab === 'progreso' && 'Progreso'}
                   {activeTab === tab && (
                     <motion.div
                       layoutId="activeTabIndicator"
@@ -402,6 +405,18 @@ export default function ExerciseInfo({ exercise, isOpen, onClose }: ExerciseInfo
               )}
 
             </div>
+
+              {activeTab === 'progreso' && (
+                <div id="exercise-info-progress" className="space-y-3">
+                  {userId && exerciseId ? (
+                    <Suspense fallback={<p className="text-xs text-neutral-500">Cargando gráfica…</p>}>
+                      <ExerciseProgressChart userId={userId} exerciseId={exerciseId} />
+                    </Suspense>
+                  ) : (
+                    <p className="text-xs text-neutral-500">Inicia sesión para ver tu progreso en este ejercicio.</p>
+                  )}
+                </div>
+              )}
 
             {/* Bottom Footer Action (Close) */}
             <div className="p-4 border-t border-neutral-800 bg-neutral-950/40 flex justify-end">

@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { apiFetch } from '../lib/api';
 import { fmtKg } from '../lib/measure';
 import { StagnationItem } from '../types';
+
+const WeeklyVolume = lazy(() => import('./WeeklyVolume'));
 
 type Home = {
   tomorrow: string;
@@ -42,9 +44,11 @@ function agrupar(items: { muscle: string; sets: number }[]) {
 export default function HomeProgress({
   userId,
   onStart,
+  onOpenStats,
 }: {
   userId: string;
   onStart: (routineId: string) => void;
+  onOpenStats?: () => void;
 }) {
   const [home, setHome] = useState<Home | null>(null);
   const [stagnation, setStagnation] = useState<StagnationItem[]>([]);
@@ -133,9 +137,16 @@ export default function HomeProgress({
           </button>
         )}
       </div>
-      <button type="button" onClick={loadStats} className="text-[11px] text-lime-400 font-bold">
-        Esta semana
-      </button>
+      <div className="flex items-center justify-between">
+        <button type="button" onClick={loadStats} className="text-[11px] text-lime-400 font-bold">
+          Esta semana
+        </button>
+        {onOpenStats && (
+          <button type="button" id="btn-open-progress-charts" onClick={onOpenStats} className="text-[11px] text-lime-400 font-bold">
+            Ver gráficas
+          </button>
+        )}
+      </div>
       {openStats && stats && (
         <div className="text-[11px] text-neutral-300 space-y-1">
           {agrupar(stats.volume_7d || []).map((v) => (
@@ -153,6 +164,9 @@ export default function HomeProgress({
           ))}
         </div>
       )}
+      <Suspense fallback={null}>
+        <WeeklyVolume userId={userId} compact />
+      </Suspense>
     </div>
   );
 }

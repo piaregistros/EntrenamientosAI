@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Dumbbell, Lock, Mail, AlertCircle, Loader, Fingerprint } from 'lucide-react';
-import { motion } from 'motion/react';
 import { apiFetch } from '../lib/api';
 
 interface LoginProps {
@@ -163,38 +162,18 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
       <div className="w-full max-w-md space-y-8 z-10">
         <div className="text-center">
-          <motion.div 
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, type: "spring" }}
-            className="inline-flex p-4 rounded-3xl bg-neutral-900 border border-neutral-800 text-lime-400 mb-4 shadow-xl"
-          >
+          <div className="inline-flex p-4 rounded-3xl bg-neutral-900 border border-neutral-800 text-lime-400 mb-4 shadow-xl">
             <Dumbbell size={36} className="animate-pulse" />
-          </motion.div>
-          <motion.h1 
-            initial={{ y: -10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.4 }}
-            className="text-4xl font-extrabold tracking-tight text-white"
-          >
+          </div>
+          <h1 className="text-4xl font-extrabold tracking-tight text-white">
             ENTRENAMIENTO
-          </motion.h1>
-          <motion.p 
-            initial={{ y: -10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.4 }}
-            className="text-neutral-400 mt-2 text-sm"
-          >
+          </h1>
+          <p className="text-neutral-400 mt-2 text-sm">
             Aplicación privada · Fuerza & Hipertrofia
-          </motion.p>
+          </p>
         </div>
 
-        <motion.div 
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-          className="bg-neutral-900/80 backdrop-blur-md rounded-2xl border border-neutral-800 p-6 shadow-2xl space-y-6"
-        >
+        <div className="bg-neutral-900/80 backdrop-blur-md rounded-2xl border border-neutral-800 p-6 shadow-2xl space-y-6">
           {error && (
             <div id="login-error" className="flex items-start gap-3 bg-red-950/40 border border-red-900/50 text-red-300 p-4 rounded-xl text-xs animate-shake">
               <AlertCircle className="shrink-0 mt-0.5" size={16} />
@@ -283,7 +262,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           </form>
 
           
-        </motion.div>
+        </div>
       </div>
     </div>
   );

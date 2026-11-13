@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Trophy, TrendingUp, Dumbbell, Timer, Flame, CheckCircle, BarChart3, ChevronRight, Loader, AlertTriangle } from 'lucide-react';
 import { PRRecord, WorkoutStats } from '../types';
 import { apiFetch } from '../lib/api';
-import BodyEvolutionSection from './BodyEvolutionSection';
+const BodyEvolutionSection = lazy(() => import('./BodyEvolutionSection'));
+const ExerciseProgressChart = lazy(() => import('./ExerciseProgressChart'));
+const WeeklyVolume = lazy(() => import('./WeeklyVolume'));
 
 interface StatsViewProps {
   user: any;
@@ -233,7 +235,7 @@ export default function StatsView({ user }: StatsViewProps) {
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wide">Progreso por Ejercicio</h3>
-                <p className="text-[10px] text-neutral-500">Historial de cargas máximas</p>
+                <p className="text-[10px] text-neutral-500">1RM estimado, peso máximo y volumen por sesión</p>
               </div>
               <BarChart3 size={16} className="text-lime-400" />
             </div>
@@ -252,34 +254,18 @@ export default function StatsView({ user }: StatsViewProps) {
               ))}
             </select>
 
+            {selectedExId && (
+              <Suspense fallback={<div className="py-8 flex justify-center text-lime-400"><Loader className="animate-spin" size={20} /></div>}>
+                <ExerciseProgressChart userId={user.id} exerciseId={selectedExId} />
+              </Suspense>
+            )}
+
             {loadingHistory ? (
               <div className="py-8 flex justify-center text-lime-400">
                 <Loader className="animate-spin" size={20} />
               </div>
             ) : exHistory.length > 0 ? (
               <div className="space-y-3">
-                {/* Simple mini-graph visualization */}
-                <div className="bg-neutral-950/40 p-3.5 rounded-xl border border-neutral-850 space-y-3.5">
-                  <div className="flex justify-between items-end h-20 px-2 pt-4">
-                    {exHistory.slice(-5).map((h, i) => {
-                      const maxVal = Math.max(...exHistory.map(item => item.max_weight_kg));
-                      const percentage = maxVal > 0 ? (h.max_weight_kg / maxVal) * 100 : 0;
-                      return (
-                        <div key={i} className="flex flex-col items-center flex-1 space-y-1.5 h-full justify-end">
-                          <span className="text-[9px] font-mono font-bold text-lime-400">{h.max_weight_kg}kg</span>
-                          <div 
-                            className="w-4 bg-gradient-to-t from-emerald-600 to-lime-400 rounded-t-sm"
-                            style={{ height: `${Math.max(15, percentage * 0.5)}%` }}
-                          />
-                          <span className="text-[8px] text-neutral-500 font-mono">
-                            {new Date(h.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block">Registro de Progresiones</span>
                   <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
@@ -300,6 +286,12 @@ export default function StatsView({ user }: StatsViewProps) {
             ) : (
               <p className="text-xs text-neutral-500 text-center py-6">No hay registros completados para este ejercicio en tu historial.</p>
             )}
+          </div>
+
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-lg">
+            <Suspense fallback={<p className="text-xs text-neutral-500">Cargando volumen…</p>}>
+              <WeeklyVolume userId={user.id} />
+            </Suspense>
           </div>
 
           {/* Personal Records (PRs) list */}
@@ -337,7 +329,9 @@ export default function StatsView({ user }: StatsViewProps) {
           </div>
         </>
       ) : (
-        <BodyEvolutionSection user={user} />
+        <Suspense fallback={<p className="text-xs text-neutral-500 text-center py-10">Cargando evolución…</p>}>
+          <BodyEvolutionSection user={user} />
+        </Suspense>
       )}
     </div>
   );

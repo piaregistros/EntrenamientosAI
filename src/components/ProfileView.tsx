@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { User, Lock, Trash2, KeyRound, Loader, AlertCircle, CheckCircle2, LogOut, Scale, Plus, Search } from 'lucide-react';
 import { BodyMetric } from '../types';
 import { apiFetch } from '../lib/api';
 import ThemeToggle from './ThemeToggle';
 import RestPushSettings from './RestPushSettings';
-import ManageView from './ManageView';
+const ManageView = lazy(() => import('./ManageView'));
 
 interface ProfileViewProps {
   user: any;
@@ -261,7 +261,7 @@ export default function ProfileView({ user, onLogout }: ProfileViewProps) {
     }
   };
 
-  if (showManage) return <ManageView user={user} onBack={() => setShowManage(false)} />;
+  if (showManage) return <Suspense fallback={<div className="min-h-screen bg-neutral-950 flex items-center justify-center text-lime-400 font-bold">Cargando...</div>}><ManageView user={user} onBack={() => setShowManage(false)} /></Suspense>;
 
   return (
     <div id="profile-panel-container" className="min-h-screen bg-neutral-950 text-neutral-100 pb-24 px-4 pt-6 max-w-md mx-auto select-none space-y-6">

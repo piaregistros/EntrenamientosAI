@@ -62,16 +62,30 @@ type Bank = Record<string, string[]>;
 const FRONT = body.front as Bank;
 const BACK = body.back as Bank;
 
+function heatFill(t: number): string {
+  const v = Math.max(0, Math.min(1, t));
+  return `color-mix(in srgb, var(--muscle-primary) ${Math.round(v * 100)}%, var(--muscle-idle))`;
+}
+
+function intensityOf(key: string, heat?: Record<string, number>): number {
+  if (!heat) return 0;
+  if (heat[key] != null) return heat[key];
+  const base = key.replace(/_front$/, '').replace(/_back$/, '');
+  return heat[base] ?? 0;
+}
+
 function BodySvg({
   view,
   focus,
   primary,
   secondary,
+  heat,
 }: {
   view: MuscleView;
   focus: MuscleFocus;
   primary: Set<string>;
   secondary: Set<string>;
+  heat?: Record<string, number>;
 }) {
   const bank = view === 'front' ? FRONT : BACK;
   const outline = view === 'front' ? body.outlineFront : body.outlineBack;
@@ -89,7 +103,11 @@ function BodySvg({
     const keys = slugKeys[slug] ?? [];
     let fill = 'var(--muscle-idle)';
     let bucket = idle;
-    if (keys.some((k) => primary.has(k))) {
+    if (heat) {
+      const t = Math.max(0, ...keys.map((k) => intensityOf(k, heat)), intensityOf(slug, heat));
+      fill = heatFill(t);
+      bucket = t > 0 ? top : idle;
+    } else if (keys.some((k) => primary.has(k))) {
       fill = 'var(--muscle-primary)';
       bucket = top;
     } else if (keys.some((k) => secondary.has(k))) {
@@ -123,17 +141,19 @@ export default function MuscleMap({
   highlight,
   compact = false,
   className = '',
+  heat,
 }: {
   highlight: MuscleHighlight;
   compact?: boolean;
   className?: string;
+  heat?: Record<string, number>;
 }) {
   const primary = new Set(expand(highlight.primary));
   const secondary = new Set(expand(highlight.secondary).filter((k) => !primary.has(k)));
   const focus = compact ? highlight.focus : 'full';
   return (
     <div className={className}>
-      <BodySvg view={highlight.view} focus={focus} primary={primary} secondary={secondary} />
+      <BodySvg view={highlight.view} focus={focus} primary={primary} secondary={secondary} heat={heat} />
     </div>
   );
 }

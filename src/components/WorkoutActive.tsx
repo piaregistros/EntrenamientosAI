@@ -10,6 +10,8 @@ import { rebuildSessionExercises } from '../lib/rebuildSession';
 import { REST_MIN, REST_STEP, formatRest, rememberExerciseRest, resolveRestSeconds } from '../lib/restTimer';
 import { cancelRestPush, scheduleRestPush } from '../lib/push';
 import ExerciseIcon from './ExerciseIcon';
+import WarmupBlock from './WarmupBlock';
+import type { WarmupSet } from '../lib/warmup';
 
 interface WorkoutActiveProps {
   user: any;
@@ -634,6 +636,29 @@ export default function WorkoutActive({
     setSetNote('');
   }, [activeExIndex, exercises, recommendations]);
 
+  const persistSet = async (opts: { weight: number; reps: number; isWarmup: boolean; rir: number | null; notes?: string; startRest: boolean; }) => {
+    if (!workoutLog || !activeExercise) return;
+    const nextSetNumber =
+      loggedSets.filter(s => s.exercise_id === activeExercise.id).length + 1;
+    const res = await apiFetch(`/api/workouts/${workoutLog.id}/sets?user_id=${encodeURIComponent(user.id)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        exercise_id: activeExercise.id,
+        set_number: nextSetNumber,
+        weight_kg: opts.weight,
+        reps: opts.reps,
+        rir: opts.rir,
+        is_warmup: opts.isWarmup,
+        notes: opts.notes || '',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || data.error || 'No se pudo guardar la serie');
+    setLoggedSets((current) => [...current, data]);
+    if (opts.startRest) beginRest(resolveRestSeconds(activeExerciseItem));
+  };
+
   const handleAddSet = async () => {
     if (!workoutLog || !activeExercise) return;
     const weight = parseFloat(inputWeight);
@@ -648,42 +673,25 @@ export default function WorkoutActive({
     setError(null);
 
     try {
-      // El backend exige set_number.
-      // Calculamos el siguiente número únicamente para
-      // el ejercicio activo.
-      const nextSetNumber =
-        loggedSets.filter(s => s.exercise_id === activeExercise.id).length + 1;
-
-      const res = await apiFetch(`/api/workouts/${workoutLog.id}/sets?user_id=${encodeURIComponent(user.id)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          exercise_id: activeExercise.id,
-          set_number: nextSetNumber,
-          weight_kg: weight,
-          reps: reps,
-          rir: isWarmup || inputRir === 'N/A' ? null : parseInt(inputRir),
-          is_warmup: isWarmup,
-          notes: setNote
-        })
+      await persistSet({
+        weight,
+        reps,
+        isWarmup,
+        rir: isWarmup || inputRir === 'N/A' ? null : parseInt(inputRir),
+        notes: setNote,
+        startRest: true,
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || data.error || 'No se pudo guardar la serie');
-
-      // Update logged sets locally
-      setLoggedSets([...loggedSets, data]);
-      setSetNote(''); // clear note
-
-      // Temporizador de descanso automático (defaults por tipo + preferencia guardada).
-      beginRest(resolveRestSeconds(activeExerciseItem));
+      setSetNote('');
     } catch (err: any) {
       setError(err.message || 'Error al guardar la serie.');
     } finally {
       setSubmittingSet(false);
     }
+  };
+
+  const logSuggestedWarmup = async (set: WarmupSet) => {
+    setError(null);
+    await persistSet({ weight: set.weight_kg, reps: set.reps, isWarmup: true, rir: null, startRest: false });
   };
 
   const handleDeleteSet = async (setId: string) => {
@@ -934,6 +942,14 @@ export default function WorkoutActive({
 
   const activeExerciseSets = loggedSets.filter(s => s.exercise_id === activeExercise?.id);
   const activeRec = recommendations.find(r => r.exercise_id === activeExercise?.id);
+  const plannedWorkingWeight = (() => {
+    const rec = activeRec?.recommended_weight_kg;
+    if (rec != null && Number(rec) > 0) return Number(rec);
+    const last = (activeExerciseItem?.last_performance?.sets || []).filter((s: any) => !s.is_warmup);
+    if (last.length) return Math.max(...last.map((s: any) => Number(s.weight_kg) || 0));
+    const input = parseFloat(inputWeight);
+    return Number.isFinite(input) && input > 0 ? input : 0;
+  })();
   // Paso de los botones +/-: el efectivo del servidor (según equipo), luego el del ejercicio, luego 2,5 kg.
   const weightStep = Number(activeRec?.increment_kg) > 0 ? Number(activeRec.increment_kg) : (Number(activeExercise?.weight_increment_kg) > 0 ? Number(activeExercise.weight_increment_kg) : 2.5);
 
@@ -1190,6 +1206,17 @@ export default function WorkoutActive({
           </div>
         )}
 
+        {activeExercise && !isTimedExercise(activeExerciseItem) && plannedWorkingWeight > 0 && (
+          <WarmupBlock
+            exercise={activeExercise}
+            workingWeight={plannedWorkingWeight}
+            loggedSets={activeExerciseSets}
+            disabled={submittingSet}
+            onLog={logSuggestedWarmup}
+            onDelete={handleDeleteSet}
+          />
+        )}
+
         {/* Set Logger Inputs Form */}
         {activeExercise && (
           <div id="set-logger-inputs" className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-lg space-y-4">
@@ -1340,9 +1367,6 @@ export default function WorkoutActive({
                     return 'Discos: ' + (used.length ? used.join(' + ') + ' por lado' : 'solo barra');
                   })()}
                 </p>
-                <button type="button" className="text-xs font-bold text-lime-300 underline" onClick={() => { setInputWeight(String(Math.round(((parseFloat(inputWeight) || 0) * 0.5) / 2.5) * 2.5)); setIsWarmup(true); }}>
-                  Calentamiento 50%
-                </button>
               </div>
             )}
               <input

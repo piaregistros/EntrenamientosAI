@@ -1,17 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { apiFetch } from './lib/api';
-import { ensurePushReady } from './lib/push';
-import BottomNav from './components/BottomNav';
 import Login from './components/Login';
-import Dashboard from './components/Dashboard';
-import WorkoutActive from './components/WorkoutActive';
-import HistoryList from './components/HistoryList';
-import StatsView from './components/StatsView';
-import ProfileView from './components/ProfileView';
-import Onboarding from './components/Onboarding/Onboarding';
-import DietView from './components/DietView';
-import ExerciseInfo from './components/ExerciseInfo';
 import { Exercise } from './types';
+
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const WorkoutActive = lazy(() => import('./components/WorkoutActive'));
+const HistoryList = lazy(() => import('./components/HistoryList'));
+const StatsView = lazy(() => import('./components/StatsView'));
+const ProfileView = lazy(() => import('./components/ProfileView'));
+const Onboarding = lazy(() => import('./components/Onboarding/Onboarding'));
+const DietView = lazy(() => import('./components/DietView'));
+const ExerciseInfo = lazy(() => import('./components/ExerciseInfo'));
+const BottomNav = lazy(() => import('./components/BottomNav'));
+
+function ScreenFallback() {
+  return (
+    <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-lime-400 font-bold">
+      Cargando...
+    </div>
+  );
+}
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -96,39 +104,60 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
-    ensurePushReady().catch(() => {});
+    import('./lib/push').then((m) => m.ensurePushReady()).catch(() => {});
   }, [user]);
+
+  const infoModal = (
+    <Suspense fallback={null}>
+      <ExerciseInfo
+        exercise={selectedExercise}
+        isOpen={isExerciseInfoOpen}
+        onClose={() => setIsExerciseInfoOpen(false)}
+        userId={user?.id}
+      />
+    </Suspense>
+  );
 
   if (checkingSession) {
     return <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-lime-400 font-bold">Iniciando...</div>;
   }
   if (!user) return <Login onLoginSuccess={(u: any) => { setUser(u); setActiveTab('home'); apiFetch('/api/onboarding').then(r => r.json()).then(d => setNeedsOnboarding(!!d.required)).catch(() => {}); }} />;
-  if (needsOnboarding) return <Onboarding user={user} onComplete={() => setNeedsOnboarding(false)} />;
+  if (needsOnboarding) {
+    return (
+      <Suspense fallback={<ScreenFallback />}>
+        <Onboarding user={user} onComplete={() => setNeedsOnboarding(false)} />
+      </Suspense>
+    );
+  }
 
   if (activeRoutineId) {
     return (
       <div className="bg-neutral-950 min-h-screen">
-        <WorkoutActive user={user} routineId={activeRoutineId} existingWorkoutId={activeWorkoutId}
-          onWorkoutFinished={() => { setActiveWorkoutId(null); setActiveRoutineId(null); navigateToTab('history'); }}
-          onWorkoutExit={() => { setActiveWorkoutId(null); setActiveRoutineId(null); navigateToTab('home'); }}
-          onOpenExerciseInfo={handleOpenExerciseInfo} />
-        <ExerciseInfo exercise={selectedExercise} isOpen={isExerciseInfoOpen} onClose={() => setIsExerciseInfoOpen(false)} />
+        <Suspense fallback={<ScreenFallback />}>
+          <WorkoutActive user={user} routineId={activeRoutineId} existingWorkoutId={activeWorkoutId}
+            onWorkoutFinished={() => { setActiveWorkoutId(null); setActiveRoutineId(null); navigateToTab('history'); }}
+            onWorkoutExit={() => { setActiveWorkoutId(null); setActiveRoutineId(null); navigateToTab('home'); }}
+            onOpenExerciseInfo={handleOpenExerciseInfo} />
+        </Suspense>
+        {infoModal}
       </div>
     );
   }
 
   return (
     <div className="bg-neutral-950 min-h-screen">
-      {activeTab === 'home' && (
-        <Dashboard user={user} onStartWorkout={(id) => { setActiveWorkoutId(null); setActiveRoutineId(id); }}
-          onNavigateToTab={(tab) => navigateToTab(tab)} onOpenExerciseInfo={handleOpenExerciseInfo} />
-      )}
-      {activeTab === 'history' && <HistoryList user={user} onOpenExerciseInfo={handleOpenExerciseInfo} />}
-      {activeTab === 'stats' && <StatsView user={user} />}
-      {activeTab === 'diet' && <DietView user={user} />}
-      {activeTab === 'profile' && <ProfileView user={user} onLogout={() => { setUser(null); setActiveRoutineId(null); setActiveTab('home'); }} />}
-      <BottomNav activeTab={activeTab} setActiveTab={navigateToTab} />
-      <ExerciseInfo exercise={selectedExercise} isOpen={isExerciseInfoOpen} onClose={() => setIsExerciseInfoOpen(false)} />
+      <Suspense fallback={<ScreenFallback />}>
+        {activeTab === 'home' && (
+          <Dashboard user={user} onStartWorkout={(id) => { setActiveWorkoutId(null); setActiveRoutineId(id); }}
+            onNavigateToTab={(tab) => navigateToTab(tab)} onOpenExerciseInfo={handleOpenExerciseInfo} />
+        )}
+        {activeTab === 'history' && <HistoryList user={user} onOpenExerciseInfo={handleOpenExerciseInfo} />}
+        {activeTab === 'stats' && <StatsView user={user} />}
+        {activeTab === 'diet' && <DietView user={user} />}
+        {activeTab === 'profile' && <ProfileView user={user} onLogout={() => { setUser(null); setActiveRoutineId(null); setActiveTab('home'); }} />}
+        <BottomNav activeTab={activeTab} setActiveTab={navigateToTab} />
+      </Suspense>
+      {infoModal}
     </div>
   );
 }
