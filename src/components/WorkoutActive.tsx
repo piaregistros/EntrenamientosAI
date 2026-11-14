@@ -5,6 +5,7 @@ import { Play, Dumbbell, Timer, ArrowRight, ArrowLeft, Plus, Check, Trash2, Refr
 import { motion, AnimatePresence } from 'motion/react';
 import { Exercise, Routine, RoutineExercise, WorkoutLog, WorkoutSet, ExerciseSubstitution, SubstituteResponse, SubstituteOption, StagnationItem } from '../types';
 import { apiFetch } from '../lib/api';
+import { plateBreakdown, stepWeight, usesPlateCalculator } from '../lib/weightControl';
 import { isTimedExercise, rememberMeasure, fmtKg } from '../lib/measure';
 import { rebuildSessionExercises } from '../lib/rebuildSession';
 import { REST_MIN, REST_STEP, formatRest, rememberExerciseRest, resolveRestSeconds } from '../lib/restTimer';
@@ -905,10 +906,16 @@ export default function WorkoutActive({
   };
 
   // Adjust numeric helpers with ease
-  const adjustWeight = (amount: number) => {
+  // Fase 12b: con kettlebells, +/− saltan entre los pesos que hay (desde 0, a la más ligera).
+  // El valor se recuerda por ejercicio: antes se perdía si llegaba la recomendación del servidor
+  // (el efecto de sincronización repone el valor inicial) y el primer «+» parecía no hacer nada.
+  const adjustWeight = (direction: 1 | -1) => {
     const current = parseFloat(inputWeight) || 0;
-    const next = Math.max(0, current + amount);
-    setInputWeight(next.toString());
+    const steps = activeRec?.weight_steps;
+    const next = stepWeight(current, direction, weightStep, steps);
+    const text = String(next);
+    setInputWeight(text);
+    if (activeExercise?.id) lastWeightByExercise.current[String(activeExercise.id)] = text;
   };
 
   const adjustReps = (amount: number) => {
@@ -954,10 +961,11 @@ export default function WorkoutActive({
   const weightStep = Number(activeRec?.increment_kg) > 0 ? Number(activeRec.increment_kg) : (Number(activeExercise?.weight_increment_kg) > 0 ? Number(activeExercise.weight_increment_kg) : 2.5);
 
   return (
-    <div id="active-workout-panel" className={`min-h-screen w-full bg-neutral-950 text-neutral-100 max-w-md mx-auto select-none relative ${restSecondsLeft !== null ? "pb-36" : "pb-8"}`}>
+    <div id="active-workout-panel" className="min-h-screen w-full bg-neutral-950 text-neutral-100 max-w-md mx-auto select-none relative pb-8">
       
-      {/* Upper sticky header with timer */}
-      <div className="sticky top-0 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-900 px-4 py-3.5 z-30 flex items-center justify-between">
+      {/* Cabecera fija: tiempo, rutina, Finalizar y (si corre) la barra de descanso */}
+      <div className="sticky top-0 z-30 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-900">
+      <div className="px-4 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-lime-500/10 border border-lime-500/20 flex items-center justify-center text-lime-400">
             <Timer size={16} className="animate-pulse" />
@@ -978,6 +986,71 @@ export default function WorkoutActive({
         >
           Finalizar
         </button>
+      </div>
+
+      {/* Barra de descanso (fase 12b): ARRIBA, pegada bajo la cabecera, y no abajo. Una barra fija
+          en la parte inferior tapaba justo los controles de la serie (+/−, Registrar) y «Cancelar
+          Sesión»: los clics caían en la barra. Arriba no cubre nunca los controles del final. */}
+      <AnimatePresence>
+        {restSecondsLeft !== null && (
+          <motion.div
+            id="rest-timer-bar"
+            initial={{ y: -16, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -16, opacity: 0 }}
+            className="mx-3 mb-2 mt-1 bg-lime-400 text-black border border-lime-300 rounded-2xl px-3 py-2 shadow-xl flex items-center select-none"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="min-w-[3.25rem] h-9 rounded-xl bg-black/10 flex items-center justify-center font-black tabular-nums text-sm">
+                    {formatRest(restSecondsLeft)}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-black tracking-wide uppercase">Descanso</h4>
+                    <p className="text-[10px] opacity-75 font-medium mt-0.5 truncate">Respira y prepárate para la siguiente serie</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    id="btn-timer-minus-15"
+                    type="button"
+                    onClick={() => addRestSeconds(-REST_STEP)}
+                    className="bg-black/10 hover:bg-black/15 font-bold px-2 py-1.5 rounded-lg text-[10px]"
+                    style={{ minHeight: '30px' }}
+                  >
+                    −15 s
+                  </button>
+                  <button
+                    id="btn-timer-plus-15"
+                    type="button"
+                    onClick={() => addRestSeconds(REST_STEP)}
+                    className="bg-black/10 hover:bg-black/15 font-bold px-2 py-1.5 rounded-lg text-[10px]"
+                    style={{ minHeight: '30px' }}
+                  >
+                    +15 s
+                  </button>
+                  <button
+                    id="btn-timer-skip"
+                    type="button"
+                    onClick={() => clearRest()}
+                    className="bg-black text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px]"
+                    style={{ minHeight: '30px' }}
+                  >
+                    Omitir
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 h-1.5 rounded-full bg-black/15 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-black/40 transition-[width] duration-200"
+                  style={{ width: restProgress + '%' }}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       </div>
 
       <div className="px-4 mt-4 space-y-5">
@@ -1231,7 +1304,7 @@ export default function WorkoutActive({
                     <button
                       id="btn-weight-minus"
                       type="button"
-                      onClick={() => adjustWeight(-weightStep)}
+                      onClick={() => adjustWeight(-1)}
                       className="w-8 h-8 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white flex items-center justify-center font-bold text-sm border border-neutral-800 active:bg-neutral-850"
                       style={{ minHeight: '32px' }}
                     >
@@ -1251,7 +1324,7 @@ export default function WorkoutActive({
                     <button
                       id="btn-weight-plus"
                       type="button"
-                      onClick={() => adjustWeight(weightStep)}
+                      onClick={() => adjustWeight(1)}
                       className="w-8 h-8 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white flex items-center justify-center font-bold text-sm border border-neutral-800 active:bg-neutral-850"
                       style={{ minHeight: '32px' }}
                     >
@@ -1353,19 +1426,10 @@ export default function WorkoutActive({
             </div>
 
             <div className="space-y-2">
-{!isTimedExercise(activeExerciseItem) && (
+{!isTimedExercise(activeExerciseItem) && usesPlateCalculator(activeExercise?.equipment) && (
               <div className="mt-2 space-y-1">
-                <p className="text-xs font-bold text-lime-400">
-                  {(() => {
-                    const side = Math.max(0, (parseFloat(inputWeight) || 0) - 20) / 2;
-                    const plates = [25, 20, 15, 10, 5, 2.5, 1.25];
-                    let left = side; const used: string[] = [];
-                    for (const pl of plates) {
-                      const n = Math.floor(left / pl + 1e-6);
-                      if (n) { used.push(n + '×' + pl); left = Math.round((left - n * pl) * 100) / 100; }
-                    }
-                    return 'Discos: ' + (used.length ? used.join(' + ') + ' por lado' : 'solo barra');
-                  })()}
+                <p id="plate-breakdown" className="text-xs font-bold text-lime-400">
+                  {plateBreakdown(parseFloat(inputWeight) || 0)}
                 </p>
               </div>
             )}
@@ -1518,72 +1582,8 @@ export default function WorkoutActive({
           </button>
         </div>
 
-        {/* Hueco para que la barra fija del temporizador no tape ni intercepte Cancelar/Salir. */}
-        {restSecondsLeft !== null && <div aria-hidden="true" className="h-28" />}
-
       </div>
 
-      {/* Floating Rest Timer Component */}
-      <AnimatePresence>
-        {restSecondsLeft !== null && (
-          <motion.div
-            id="rest-timer-bar"
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 50, opacity: 0 }}
-            className="fixed bottom-4 left-4 right-4 z-40 bg-lime-400 text-black border border-lime-300 rounded-2xl p-4 shadow-2xl flex items-center select-none max-w-md mx-auto"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="min-w-[3.25rem] h-9 rounded-xl bg-black/10 flex items-center justify-center font-black tabular-nums text-sm">
-                    {formatRest(restSecondsLeft)}
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-black tracking-wide uppercase">Descanso</h4>
-                    <p className="text-[10px] opacity-75 font-medium mt-0.5 truncate">Respira y prepárate para la siguiente serie</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    id="btn-timer-minus-15"
-                    type="button"
-                    onClick={() => addRestSeconds(-REST_STEP)}
-                    className="bg-black/10 hover:bg-black/15 font-bold px-2 py-1.5 rounded-lg text-[10px]"
-                    style={{ minHeight: '30px' }}
-                  >
-                    −15 s
-                  </button>
-                  <button
-                    id="btn-timer-plus-15"
-                    type="button"
-                    onClick={() => addRestSeconds(REST_STEP)}
-                    className="bg-black/10 hover:bg-black/15 font-bold px-2 py-1.5 rounded-lg text-[10px]"
-                    style={{ minHeight: '30px' }}
-                  >
-                    +15 s
-                  </button>
-                  <button
-                    id="btn-timer-skip"
-                    type="button"
-                    onClick={() => clearRest()}
-                    className="bg-black text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px]"
-                    style={{ minHeight: '30px' }}
-                  >
-                    Omitir
-                  </button>
-                </div>
-              </div>
-              <div className="mt-2 h-1.5 rounded-full bg-black/15 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-black/40 transition-[width] duration-200"
-                  style={{ width: restProgress + '%' }}
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Substitution Drawer Modal */}
       {showSubModal && (

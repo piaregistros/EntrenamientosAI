@@ -1,4 +1,4 @@
-const CACHE = 'entreno-pwa-v3';
+const CACHE = 'entreno-pwa-v4';
 
 // No precacheamos "/" (index.html): si el SW no se reinstala tras un deploy,
 // un índice viejo apunta a chunks con hash que ya no existen y la app

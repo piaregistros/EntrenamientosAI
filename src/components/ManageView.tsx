@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Pencil, Loader, Check, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import ExerciseIcon from './ExerciseIcon';
+import { toList } from '../lib/apiShapes';
 
 // Fase 7: gestión de rutinas (y de sus ejercicios) y de ejercicios propios. Admin y propietario.
 interface Props {
@@ -40,15 +41,19 @@ export default function ManageView({ user, onBack }: Props) {
 
   const loadRoutines = async () => {
     const res = await apiFetch(`/api/routines?user_id=${encodeURIComponent(user.id)}`);
-    if (res.ok) setRoutines(await res.json());
+    if (res.ok) setRoutines(toList(await res.json(), 'routines'));
   };
   const loadExercises = async () => {
     const res = await apiFetch('/api/exercises?include_inactive=true');
-    if (res.ok) setExercises(await res.json());
+    // /api/exercises devuelve { count, exercises }: no es un array (causa del «filter is not a function»).
+    if (res.ok) setExercises(toList(await res.json(), 'exercises'));
   };
   const loadRoutine = async (id: string) => {
     const res = await apiFetch(`/api/routines/${id}`);
-    if (res.ok) setOpenRoutine(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setOpenRoutine(data && typeof data === 'object' ? { ...data, exercises: toList(data.exercises) } : null);
+    }
   };
 
   useEffect(() => { void loadRoutines(); void loadExercises(); }, []);
@@ -121,7 +126,7 @@ export default function ManageView({ user, onBack }: Props) {
   };
   const move = async (index: number, delta: number) => {
     if (!openRoutine) return;
-    const ids = openRoutine.exercises.map((e: any) => e.id);
+    const ids = toList(openRoutine.exercises).map((e: any) => e.id);
     const j = index + delta;
     if (j < 0 || j >= ids.length) return;
     [ids[index], ids[j]] = [ids[j], ids[index]];
@@ -131,14 +136,14 @@ export default function ManageView({ user, onBack }: Props) {
   const addCandidates = useMemo(() => {
     const q = addQuery.trim().toLowerCase();
     if (q.length < 2) return [];
-    const inRoutine = new Set((openRoutine?.exercises || []).map((e: any) => e.exercise_id));
-    return exercises.filter((e) => e.is_active && !inRoutine.has(e.id) && e.name.toLowerCase().includes(q)).slice(0, 8);
+    const inRoutine = new Set(toList(openRoutine?.exercises).map((e: any) => e.exercise_id));
+    return toList(exercises).filter((e: any) => e.is_active && !inRoutine.has(e.id) && String(e.name || '').toLowerCase().includes(q)).slice(0, 8);
   }, [addQuery, exercises, openRoutine]);
 
   // ---- ejercicios
   const visibleExercises = useMemo(() => {
     const q = exFilter.trim().toLowerCase();
-    return exercises.filter((e) => !q || e.name.toLowerCase().includes(q) || (e.target_muscle || '').toLowerCase().includes(q));
+    return toList(exercises).filter((e: any) => !q || String(e.name || '').toLowerCase().includes(q) || (e.target_muscle || '').toLowerCase().includes(q));
   }, [exercises, exFilter]);
 
   const saveExercise = async () => {
@@ -200,7 +205,7 @@ export default function ManageView({ user, onBack }: Props) {
             <button type="button" id="btn-create-routine" disabled={busy || !newRoutineName.trim()} onClick={createRoutine}
               className="bg-lime-400 text-black font-extrabold text-xs px-3 rounded-xl flex items-center gap-1 disabled:opacity-50"><Plus size={14} /> Crear</button>
           </div>
-          {routines.map((r) => (
+          {toList(routines).map((r: any) => (
             <div key={r.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 flex items-center gap-2">
               {renaming === r.id ? (
                 <>
@@ -225,7 +230,7 @@ export default function ManageView({ user, onBack }: Props) {
               )}
             </div>
           ))}
-          {routines.length === 0 && <p className="text-xs text-neutral-500">Aún no tienes rutinas.</p>}
+          {toList(routines).length === 0 && <p className="text-xs text-neutral-500">Aún no tienes rutinas.</p>}
         </div>
       )}
 
@@ -239,7 +244,7 @@ export default function ManageView({ user, onBack }: Props) {
             )}
           </h3>
 
-          {(openRoutine.exercises || []).map((re: any, i: number) => (
+          {toList(openRoutine.exercises).map((re: any, i: number) => (
             <div key={re.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <ExerciseIcon exercise={re} className="w-12 h-12 rounded-lg shrink-0" />
@@ -264,7 +269,7 @@ export default function ManageView({ user, onBack }: Props) {
           ))}
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 space-y-2">
             <input id="input-add-exercise" className={inputCls} value={addQuery} onChange={(e) => setAddQuery(e.target.value)} placeholder="Añadir ejercicio: escribe para buscar" />
-            {addCandidates.map((e) => (
+            {addCandidates.map((e: any) => (
               <button key={e.id} type="button" onClick={() => addToRoutine(e.id)} className="w-full text-left flex items-center gap-2 p-2 rounded-lg bg-neutral-950 border border-neutral-800">
                 <ExerciseIcon exercise={e} className="w-10 h-10 rounded-md shrink-0" />
                 <span className="flex-1 text-xs font-bold text-white">{e.name}</span>
@@ -279,7 +284,7 @@ export default function ManageView({ user, onBack }: Props) {
       {tab === 'exercises' && !editing && (
         <div className="space-y-3">
           <input id="input-filter-exercises" className={inputCls} value={exFilter} onChange={(e) => setExFilter(e.target.value)} placeholder="Filtrar por nombre o músculo" />
-          {visibleExercises.map((e) => (
+          {visibleExercises.map((e: any) => (
             <div key={e.id} className={`bg-neutral-900 border border-neutral-800 rounded-2xl p-3 flex items-center gap-2 ${e.is_active ? '' : 'opacity-50'}`}>
               <ExerciseIcon exercise={e} className="w-12 h-12 rounded-lg shrink-0" />
               <div className="flex-1 min-w-0">
