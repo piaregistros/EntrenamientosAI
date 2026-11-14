@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DEFAULT_LOCATION_FILTER, suggestionLocation, LocationFilter } from '../lib/homeLocation';
 import { Play, Dumbbell, Scale, TrendingUp, Calendar, CheckCircle2, ChevronRight, Plus, Loader, Info } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Routine, WorkoutLog, BodyMetric } from '../types';
@@ -16,7 +17,7 @@ interface DashboardProps {
 
 export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpenExerciseInfo }: DashboardProps) {
   const [routines, setRoutines] = useState<Routine[]>([]);
-  const [locationFilter, setLocationFilter] = useState<'todas' | 'gimnasio' | 'casa'>('todas');
+  const [locationFilter, setLocationFilter] = useState<LocationFilter>(DEFAULT_LOCATION_FILTER);
   const [lastWorkout, setLastWorkout] = useState<WorkoutLog | null>(null);
   const [activeWorkout, setActiveWorkout] = useState<WorkoutLog | null>(null);
   const [metrics, setMetrics] = useState<BodyMetric[]>([]);
@@ -264,21 +265,6 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
 
   const visibleRoutines = routines.filter((r) => locationFilter === 'todas' || locationOf(r) === locationFilter);
 
-  // La rotación A→B→C se hace DENTRO del mismo sitio (gimnasio o casa).
-  const getNextRecommendedRoutine = () => {
-    if (routines.length === 0) return null;
-    const last = lastWorkout ? routines.find((r) => r.id === lastWorkout.routine_id) : undefined;
-    const groupLoc = locationFilter === 'todas' ? (last ? locationOf(last) : 'gimnasio') : locationFilter;
-    const group = routines.filter((r) => locationOf(r) === groupLoc);
-    const seq = (group.length ? group : visibleRoutines).length ? (group.length ? group : visibleRoutines) : routines;
-    if (!lastWorkout || !seq.some((r) => r.id === lastWorkout.routine_id)) return seq[0];
-    const lastIndex = seq.findIndex((r) => r.id === lastWorkout.routine_id);
-    if (lastIndex === -1 || lastIndex === seq.length - 1) return seq[0];
-    return seq[lastIndex + 1];
-  };
-
-  const recommendedRoutine = getNextRecommendedRoutine();
-
   if (loading) {
     return (
       <div id="dashboard-loading" className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-lime-400">
@@ -372,7 +358,7 @@ export default function Dashboard({ user, onStartWorkout, onNavigateToTab, onOpe
         </div>
       )}
 
-      {user?.id && <HomeProgress userId={user.id} onStart={onStartWorkout} onOpenStats={() => onNavigateToTab('stats')} />}
+      {user?.id && <HomeProgress userId={user.id} location={suggestionLocation(locationFilter)} onStart={onStartWorkout} onOpenStats={() => onNavigateToTab('stats')} />}
 
       {/* Routine list switcher */}
       <div className="space-y-3">

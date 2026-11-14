@@ -46,8 +46,11 @@ export default function HomeProgress({
   userId,
   onStart,
   onOpenStats,
+  location = 'gimnasio',
 }: {
   userId: string;
+  /** La sugerida es siempre la del gimnasio; con 'casa' el servidor devuelve su espejo de casa. */
+  location?: 'gimnasio' | 'casa';
   onStart: (routineId: string) => void;
   onOpenStats?: () => void;
 }) {
@@ -58,7 +61,7 @@ export default function HomeProgress({
 
   useEffect(() => {
     if (!userId) return;
-    apiFetch(`/api/progress/home?user_id=${encodeURIComponent(userId)}`)
+    apiFetch(`/api/progress/home?user_id=${encodeURIComponent(userId)}&location=${location}`)
       .then((r) => r.json())
       .then((data: Home) => {
         setHome(data);
@@ -69,7 +72,7 @@ export default function HomeProgress({
       .then((r) => r.ok ? r.json() : Promise.reject())
       .then((data) => setStagnation(Array.isArray(data?.items) ? data.items : []))
       .catch(() => { /* si falla, se usa lo que venga en /home */ });
-  }, [userId]);
+  }, [userId, location]);
 
   const loadStats = async () => {
     const res = await apiFetch(`/api/progress/stats?user_id=${encodeURIComponent(userId)}`);

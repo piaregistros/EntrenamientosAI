@@ -11,7 +11,8 @@
     "lint": "tsc --noEmit",
     "check:icons": "esbuild scripts/check-icons.ts --bundle --platform=node --format=esm --outfile=dist/check-icons.mjs --log-level=warning && node dist/check-icons.mjs",
     "check:warmup": "tsx scripts/check-warmup.ts",
-    "check:fase12b": "tsx scripts/check-fase12b.ts"
+    "check:fase12b": "tsx scripts/check-fase12b.ts",
+    "check:fase12c": "tsx scripts/check-fase12c.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
